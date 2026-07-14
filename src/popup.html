@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>履历桥 ResumeBridge</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <img class="brand-mark" src="../icons/icon128.png" alt="" />
+          <div class="brand-copy">
+            <p class="product-kicker">RESUMEBRIDGE</p>
+            <h1>履历桥</h1>
+            <p class="repo-note">一份履历，连接不同招聘系统。</p>
+          </div>
+        </div>
+        <button id="openOptions" class="ghost" type="button">设置</button>
+      </header>
+
+      <section class="panel">
+        <button id="startAutofillBtn" type="button">开始填写</button>
+        <button id="showProfilePanelBtn" class="secondary" type="button">打开资料面板</button>
+        <button id="clearMarksBtn" class="ghost full" type="button">清除颜色标记</button>
+      </section>
+
+      <section class="panel application-capture">
+        <div class="panel-heading-row">
+          <h2>投递追踪</h2>
+          <button id="openTracker" class="ghost compact" type="button">查看记录</button>
+        </div>
+        <p id="captureFeedback" class="capture-feedback" aria-live="polite">正在识别当前页面...</p>
+        <form id="applicationCaptureForm">
+          <label class="capture-field">
+            <span>公司名称</span>
+            <input id="captureCompanyName" type="text" maxlength="180" autocomplete="organization" required />
+          </label>
+          <label class="capture-field">
+            <span>申请职位</span>
+            <input id="captureJobTitle" type="text" maxlength="240" required />
+          </label>
+          <div class="capture-grid">
+            <label class="capture-field">
+              <span>投递时间</span>
+              <input id="captureAppliedAt" type="datetime-local" required />
+            </label>
+            <label class="capture-field">
+              <span>投递状态</span>
+              <select id="captureStatus">
+                <option value="待投递">待投递</option>
+                <option value="已投递" selected>已投递</option>
+                <option value="笔试">笔试</option>
+                <option value="面试">面试</option>
+                <option value="Offer">Offer</option>
+                <option value="已拒绝">已拒绝</option>
+                <option value="已撤回">已撤回</option>
+              </select>
+            </label>
+          </div>
+          <label class="capture-field">
+            <span>备注</span>
+            <textarea id="captureNotes" rows="2" maxlength="4000" placeholder="例如：内推人、笔试截止时间、后续安排"></textarea>
+          </label>
+          <button id="saveApplication" type="submit">记录本次投递</button>
+        </form>
+      </section>
+
+      <section class="panel muted">
+        <div class="mode-row"><span class="mode-dot" aria-hidden="true"></span><strong>谨慎填写模式</strong></div>
+        <div id="status">普通字段自动填写；已有内容、敏感资料和声明问答默认待确认。</div>
+      </section>
+
+      <section class="panel">
+        <h2>当前边界</h2>
+        <p class="hint">资料保存在本机浏览器。AI 只识别字段映射，不接收履历具体值；插件不会提交申请。</p>
+      </section>
+    </main>
+
+    <script src="./popup.js"></script>
+  </body>
+</html>

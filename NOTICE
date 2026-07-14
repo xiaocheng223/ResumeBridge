@@ -1,0 +1,10 @@
+ResumeBridge
+Copyright (c) 2026 ResumeBridge contributors
+
+This project is derived from OpenJobAutofill by Br1an67:
+https://github.com/Br1an67/OpenJobAutofill
+
+OpenJobAutofill is distributed under the MIT License. The original copyright
+and license notice are retained in LICENSE. ResumeBridge keeps compatible
+internal storage keys and accepts OpenJobAutofill profile backups so existing
+local profiles can migrate without a manual rewrite.

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>项目经历填写回归样例</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: #172033;
+        background: #f4f6f8;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+      main {
+        width: min(1040px, calc(100% - 32px));
+        margin: 28px auto;
+        background: #fff;
+        border: 1px solid #dce2e8;
+        border-radius: 8px;
+      }
+      .unrelated-section {
+        width: min(1040px, calc(100% - 32px));
+        margin: 0 auto 28px;
+        background: #fff;
+        border: 1px solid #dce2e8;
+        border-radius: 8px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e9ee;
+      }
+      h2 { margin: 0; font-size: 20px; }
+      button {
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid #17795b;
+        border-radius: 6px;
+        color: #116247;
+        background: #fff;
+        cursor: pointer;
+      }
+      #projectList { padding: 20px 24px 4px; }
+      .project-record-item {
+        margin-bottom: 18px;
+        padding: 18px;
+        border: 1px solid #dce2e8;
+        border-radius: 6px;
+      }
+      .project-record-item h3 { margin: 0 0 16px; font-size: 16px; }
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+      }
+      .form-item { display: grid; gap: 7px; min-width: 0; }
+      .form-item.full { grid-column: 1 / -1; }
+      label { font-size: 14px; font-weight: 600; }
+      input, select, textarea {
+        width: 100%;
+        min-width: 0;
+        padding: 9px 10px;
+        border: 1px solid #aeb8c5;
+        border-radius: 5px;
+        color: inherit;
+        background: #fff;
+        font: inherit;
+      }
+      textarea { min-height: 86px; resize: vertical; }
+      .actions { padding: 0 24px 24px; }
+      #submitApplication { border-color: #7c8795; color: #354052; }
+      @media (max-width: 680px) {
+        .field-grid { grid-template-columns: 1fr; }
+        .form-item.full { grid-column: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="project-section" data-section-title="项目经验 / 科研项目">
+      <div class="section-header">
+        <h2>项目经验 / 科研项目</h2>
+        <button id="addProject" type="button" data-add-project>+ 添加</button>
+      </div>
+      <div id="projectList"></div>
+      <div class="actions">
+        <button id="submitApplication" type="button">提交申请</button>
+      </div>
+    </main>
+    <section class="unrelated-section" data-section-title="教育经历">
+      <div class="section-header">
+        <h2>教育经历</h2>
+        <button id="unrelatedAdd" type="button">+ 添加</button>
+      </div>
+    </section>
+    <script>
+      window.__projectAddCount = 0;
+      window.__projectSubmitCount = 0;
+      window.__unrelatedAddCount = 0;
+
+      function createField(index, key, label, control) {
+        const wrapper = document.createElement("div");
+        wrapper.className = `form-item${control.tagName === "TEXTAREA" ? " full" : ""}`;
+        const labelElement = document.createElement("label");
+        labelElement.htmlFor = `${key}-${index}`;
+        labelElement.textContent = label;
+        control.id = `${key}-${index}`;
+        control.name = `projects[${index - 1}].${key}`;
+        wrapper.append(labelElement, control);
+        return wrapper;
+      }
+
+      function createProjectCard(index) {
+        const card = document.createElement("section");
+        card.className = "project-record-item";
+        card.dataset.projectIndex = String(index);
+        const title = document.createElement("h3");
+        title.textContent = `项目记录 ${index}`;
+        const grid = document.createElement("div");
+        grid.className = "field-grid";
+
+        const projectType = document.createElement("select");
+        projectType.append(new Option("请选择", ""), new Option("重点研发", "重点研发"), new Option("技术验证", "技术验证"));
+
+        const fields = [
+          ["title", "项目标题", document.createElement("input")],
+          ["organization", "项目所属机构", document.createElement("input")],
+          ["role", "担任角色", document.createElement("input")],
+          ["startDate", "起始日期", Object.assign(document.createElement("input"), { type: "month" })],
+          ["endDate", "截止日期", Object.assign(document.createElement("input"), { type: "month" })],
+          ["projectType", "项目类别", projectType],
+          ["summary", "项目简介", document.createElement("textarea")],
+          ["contribution", "个人贡献", document.createElement("textarea")],
+          ["result", "主要成果", document.createElement("textarea")],
+          ["url", "作品地址", Object.assign(document.createElement("input"), { type: "url" })]
+        ];
+
+        for (const [key, label, control] of fields) {
+          grid.append(createField(index, key, label, control));
+        }
+        card.append(title, grid);
+        return card;
+      }
+
+      function addProjectCard() {
+        const list = document.getElementById("projectList");
+        const nextIndex = list.querySelectorAll(".project-record-item").length + 1;
+        list.append(createProjectCard(nextIndex));
+      }
+
+      addProjectCard();
+      document.getElementById("addProject").addEventListener("click", () => {
+        window.__projectAddCount += 1;
+        addProjectCard();
+      });
+      document.getElementById("submitApplication").addEventListener("click", () => {
+        window.__projectSubmitCount += 1;
+      });
+      document.getElementById("unrelatedAdd").addEventListener("click", () => {
+        window.__unrelatedAddCount += 1;
+      });
+    </script>
+  </body>
+</html>

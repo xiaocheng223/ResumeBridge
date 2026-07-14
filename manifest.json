@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "ResumeBridge - 招聘表单智能补全",
+  "version": "0.1.0",
+  "description": "一份本地履历，辅助填写不同招聘系统；敏感字段默认由用户确认。",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "履历桥 ResumeBridge",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "src/options.html"
+}

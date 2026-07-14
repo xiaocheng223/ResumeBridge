@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ResumeBridge 招聘表单测试页</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": "软件开发工程师",
+        "hiringOrganization": {
+          "@type": "Organization",
+          "name": "ResumeBridge 示例科技"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #f4f6f8;
+        color: #18202a;
+      }
+
+      main {
+        width: min(760px, calc(100vw - 32px));
+        margin: 32px auto;
+      }
+
+      form {
+        display: grid;
+        gap: 18px;
+        padding: 24px;
+        border: 1px solid #d6dde4;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+
+      label,
+      legend {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      input,
+      select,
+      button {
+        min-height: 42px;
+        padding: 0 12px;
+        border: 1px solid #bcc6d0;
+        border-radius: 6px;
+        font: inherit;
+      }
+
+      fieldset {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid #d6dde4;
+        border-radius: 6px;
+      }
+
+      fieldset label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 400;
+      }
+
+      fieldset input {
+        min-height: auto;
+      }
+
+      button {
+        border-color: #176b5b;
+        background: #176b5b;
+        color: #ffffff;
+        cursor: pointer;
+      }
+
+      #submitState {
+        color: #a33434;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <form id="applicationForm">
+        <div>
+          <h1>软件开发工程师申请表</h1>
+          <p>此页面仅用于 ResumeBridge 本地回归验证。</p>
+        </div>
+
+        <div class="field">
+          <label for="candidateName">姓名</label>
+          <input id="candidateName" name="candidateName" autocomplete="name" />
+        </div>
+
+        <div class="field">
+          <label for="email">邮箱</label>
+          <input id="email" name="email" type="email" value="keep@example.com" autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label for="idNumber">身份证号码</label>
+          <input id="idNumber" name="idNumber" />
+        </div>
+
+        <div class="field">
+          <label for="emergencyContact">紧急联系人</label>
+          <input id="emergencyContact" name="emergencyContact" />
+        </div>
+
+        <div class="field">
+          <label for="degree">最高学历</label>
+          <select id="degree" name="degree">
+            <option value="">请选择</option>
+            <option value="本科">本科</option>
+            <option value="硕士研究生">硕士研究生</option>
+            <option value="博士研究生">博士研究生</option>
+          </select>
+        </div>
+
+        <fieldset>
+          <legend>是否同意背景调查</legend>
+          <label><input name="backgroundCheck" type="radio" value="是" />是</label>
+          <label><input name="backgroundCheck" type="radio" value="否" />否</label>
+        </fieldset>
+
+        <button id="submitApplication" type="submit">提交申请</button>
+        <p id="submitState">提交次数：0</p>
+      </form>
+    </main>
+
+    <script>
+      window.__resumeBridgeSubmitCount = 0;
+      document.getElementById("applicationForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        window.__resumeBridgeSubmitCount += 1;
+        document.getElementById("submitState").textContent = `提交次数：${window.__resumeBridgeSubmitCount}`;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>投递追踪 - ResumeBridge</title>
+    <link rel="stylesheet" href="./tracker.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand-lockup">
+          <img src="../icons/icon128.png" alt="" />
+          <div>
+            <p class="product-kicker">RESUMEBRIDGE</p>
+            <h1>投递追踪</h1>
+            <p class="header-note">记录保存在当前浏览器，不会上传到招聘网站或 AI 服务。</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="addApplication" type="button">新增记录</button>
+          <button id="refreshApplications" class="secondary" type="button">刷新</button>
+          <button id="exportApplications" class="secondary" type="button">导出 CSV</button>
+          <button id="clearApplications" class="danger" type="button">清空记录</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="summary-grid" aria-label="投递概览">
+        <article class="metric">
+          <span>全部记录</span>
+          <strong id="metricTotal">0</strong>
+        </article>
+        <article class="metric">
+          <span>本月投递</span>
+          <strong id="metricThisMonth">0</strong>
+        </article>
+        <article class="metric">
+          <span>流程推进中</span>
+          <strong id="metricActive">0</strong>
+        </article>
+        <article class="metric">
+          <span>Offer</span>
+          <strong id="metricOffers">0</strong>
+        </article>
+      </section>
+
+      <section class="tracker-workspace">
+        <div class="toolbar">
+          <label class="search-field">
+            <span>搜索</span>
+            <input id="applicationSearch" type="search" placeholder="公司、职位、备注或来源网站" autocomplete="off" />
+          </label>
+          <label class="filter-field">
+            <span>状态</span>
+            <select id="applicationStatusFilter">
+              <option value="">全部状态</option>
+              <option value="待投递">待投递</option>
+              <option value="已投递">已投递</option>
+              <option value="笔试">笔试</option>
+              <option value="面试">面试</option>
+              <option value="Offer">Offer</option>
+              <option value="已拒绝">已拒绝</option>
+              <option value="已撤回">已撤回</option>
+            </select>
+          </label>
+          <p id="resultCount" class="result-count">显示 0 条记录</p>
+        </div>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">公司</th>
+                <th scope="col">申请职位</th>
+                <th scope="col">投递时间</th>
+                <th scope="col">状态</th>
+                <th scope="col">备注</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody id="applicationRows"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state" hidden>
+            <strong>暂无匹配记录</strong>
+            <p>可在招聘页面打开 ResumeBridge 并确认记录，也可以在这里手动新增。</p>
+          </div>
+        </div>
+        <p id="trackerFeedback" class="tracker-feedback" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="./job-tracker.js"></script>
+    <script src="./tracker.js"></script>
+  </body>
+</html>
