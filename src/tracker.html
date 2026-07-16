@@ -20,8 +20,10 @@
         <div class="header-actions">
           <button id="addApplication" type="button">新增记录</button>
           <button id="refreshApplications" class="secondary" type="button">刷新</button>
+          <button id="importApplications" class="secondary" type="button">导入 CSV</button>
           <button id="exportApplications" class="secondary" type="button">导出 CSV</button>
           <button id="clearApplications" class="danger" type="button">清空记录</button>
+          <input id="importApplicationsFile" type="file" accept=".csv,text/csv" hidden />
         </div>
       </div>
     </header>
@@ -56,13 +58,16 @@
             <span>状态</span>
             <select id="applicationStatusFilter">
               <option value="">全部状态</option>
-              <option value="待投递">待投递</option>
-              <option value="已投递">已投递</option>
-              <option value="笔试">笔试</option>
-              <option value="面试">面试</option>
-              <option value="Offer">Offer</option>
-              <option value="已拒绝">已拒绝</option>
-              <option value="已撤回">已撤回</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>排序</span>
+            <select id="applicationSort">
+              <option value="applied-desc">投递时间：从新到旧</option>
+              <option value="applied-asc">投递时间：从旧到新</option>
+              <option value="status-updated-desc">状态更新：从新到旧</option>
+              <option value="status-updated-asc">状态更新：从旧到新</option>
+              <option value="pipeline">流程阶段</option>
             </select>
           </label>
           <p id="resultCount" class="result-count">显示 0 条记录</p>

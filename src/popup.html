@@ -33,6 +33,10 @@
         </div>
         <p id="captureFeedback" class="capture-feedback" aria-live="polite">正在识别当前页面...</p>
         <form id="applicationCaptureForm">
+          <label id="captureCandidateField" class="capture-field" hidden>
+            <span>识别到的投递</span>
+            <select id="captureCandidate"></select>
+          </label>
           <label class="capture-field">
             <span>公司名称</span>
             <input id="captureCompanyName" type="text" maxlength="180" autocomplete="organization" required />
@@ -48,17 +52,13 @@
             </label>
             <label class="capture-field">
               <span>投递状态</span>
-              <select id="captureStatus">
-                <option value="待投递">待投递</option>
-                <option value="已投递" selected>已投递</option>
-                <option value="笔试">笔试</option>
-                <option value="面试">面试</option>
-                <option value="Offer">Offer</option>
-                <option value="已拒绝">已拒绝</option>
-                <option value="已撤回">已撤回</option>
-              </select>
+              <select id="captureStatus"></select>
             </label>
           </div>
+          <label class="capture-field">
+            <span>投递渠道</span>
+            <input id="captureChannel" type="text" maxlength="120" placeholder="例如：公司官网、内推、BOSS直聘" />
+          </label>
           <label class="capture-field">
             <span>备注</span>
             <textarea id="captureNotes" rows="2" maxlength="4000" placeholder="例如：内推人、笔试截止时间、后续安排"></textarea>
@@ -78,6 +78,7 @@
       </section>
     </main>
 
+    <script src="./job-tracker.js"></script>
     <script src="./popup.js"></script>
   </body>
 </html>

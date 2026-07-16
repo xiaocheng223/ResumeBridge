@@ -235,6 +235,7 @@ test("stores, deduplicates, updates, lists, and deletes job applications", async
   assert.equal(updated.ok, true);
   assert.equal(updated.data.created, false);
   assert.equal(updated.data.application.status, "面试");
+  assert.equal(updated.data.application.statusUpdatedAt, updated.data.application.updatedAt);
   assert.equal(harness.localData.jobApplications[0].notes, "一面已安排");
 
   const listed = await harness.send({ type: "OJAF_GET_JOB_APPLICATIONS" }, trustedSender);
@@ -249,6 +250,51 @@ test("stores, deduplicates, updates, lists, and deletes job applications", async
   assert.equal(removed.ok, true);
   assert.equal(removed.data.deleted, true);
   assert.equal(harness.localData.jobApplications.length, 0);
+});
+
+test("bulk imports valid records, skips duplicates, and reports invalid rows", async () => {
+  const harness = createBackgroundHarness();
+  const imported = await harness.send(
+    {
+      type: "OJAF_IMPORT_JOB_APPLICATIONS",
+      payload: {
+        applications: [
+          {
+            companyName: "星河航天",
+            jobTitle: "结构工程师",
+            appliedAt: "2026-07-16T02:30:00.000Z",
+            status: "准备投递",
+            channel: "内推",
+            sourceUrl: "https://jobs.example.com/42?token=private",
+            statusUrl: "https://jobs.example.com/applications?token=private"
+          },
+          {
+            companyName: "星河 航天",
+            jobTitle: "结构-工程师",
+            appliedAt: "2026-07-16T08:30:00.000Z",
+            status: "待投递",
+            sourceUrl: "https://jobs.example.com/42?other=private"
+          },
+          {
+            companyName: "缺少职位的公司",
+            jobTitle: "",
+            appliedAt: "2026-07-16T02:30:00.000Z"
+          }
+        ]
+      }
+    },
+    trustedSender
+  );
+
+  assert.equal(imported.ok, true);
+  assert.equal(imported.data.importedCount, 1);
+  assert.equal(imported.data.skippedCount, 1);
+  assert.equal(imported.data.invalidCount, 1);
+  assert.equal(harness.localData.jobApplications.length, 1);
+  assert.equal(harness.localData.jobApplications[0].status, "待投递");
+  assert.equal(harness.localData.jobApplications[0].sourceUrl, "https://jobs.example.com/42");
+  assert.equal(harness.localData.jobApplications[0].statusUrl, "https://jobs.example.com/applications");
+  assert.match(harness.localData.jobApplications[0].id, /^job-/);
 });
 
 test("keeps job-search history private from content-script senders", async () => {
@@ -271,6 +317,7 @@ test("keeps job-search history private from content-script senders", async () =>
   for (const message of [
     { type: "OJAF_GET_JOB_APPLICATIONS" },
     { type: "OJAF_SAVE_JOB_APPLICATION", payload: { application: {} } },
+    { type: "OJAF_IMPORT_JOB_APPLICATIONS", payload: { applications: [] } },
     { type: "OJAF_DELETE_JOB_APPLICATION", payload: { id: "private-application" } },
     { type: "OJAF_CLEAR_JOB_APPLICATIONS" }
   ]) {

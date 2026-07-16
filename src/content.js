@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.12.0-project-experience";
+  const SCRIPT_VERSION = "0.17.0-tracker-pipeline";
 
   if (window.__OJAF_AUTOFILL_VERSION__ === SCRIPT_VERSION) {
     return;
@@ -18,8 +18,15 @@
   const PANEL_COLLAPSED_ATTR = "data-ojaf-collapsed";
   const MAX_EDIT_EXPANSIONS = 20;
   const MAX_PROJECT_REPEAT_ITEMS = 6;
+  const MAX_KNOWN_REPEAT_EXPANSIONS = 24;
   const MAX_AI_ASSIST_FIELD_COUNT = 96;
   const MAX_AI_PROFILE_CATALOG_FIELDS = 160;
+  const STRICT_SEMANTIC_BUCKETS = new Set([
+    "publicationAvailable",
+    "paperFirstAuthor",
+    "publicationDate",
+    "paperName"
+  ]);
   const PROFILE_PANEL_STATE_DEBOUNCE_MS = 300;
   let fieldCounter = 0;
   let profilePanelVisible = false;
@@ -51,10 +58,25 @@
     '[role="textbox"]',
     '[role="combobox"]',
     '[role="radio"]',
-    '[role="checkbox"]'
+    '[role="checkbox"]',
+    ".phoenix-radio-group",
+    ".phoenix-checkbox"
   ].join(",");
 
   const SITE_ADAPTERS = [
+    {
+      id: "phoenix-ats",
+      name: "Phoenix/北森招聘",
+      urlPattern: /(?:^|\.)career\.naura\.com$/i,
+      confidence: 0.96,
+      indicators: [".form-item--phoenix", ".phoenix-select", ".phoenix-radio-group", ".fields-col"],
+      containerSelector: ".form-item.form-item--phoenix,.fields-col",
+      labelSelector: ".form-item__text,.form-item__title,label",
+      sectionSelector: ".form-part-head,.form-part-head-new,.head-title,[class*='form-part-title'],[class*='part-title'],[class*='module-title'],h2,h3,h4",
+      repeatItemSelector: "[class*='record-item'],[class*='experience-item'],[class*='list-item'],[class*='resume-item']",
+      saveLabels: ["暂存", "保存", "确定", "完成"],
+      editLabels: ["编辑", "修改", "完善"]
+    },
     {
       id: "zhiye",
       name: "智易/智业 ATS",
@@ -231,6 +253,7 @@
     "专利成果",
     "自我描述",
     "有关声明",
+    "网申问答",
     "其他信息",
     "自定义资料"
   ];
@@ -294,15 +317,21 @@
     专业技术职称: ["技术职称", "职称"],
     紧急联系人电话: ["紧急联系人手机", "紧急联系人手机号", "紧急联系方式"],
     与紧急联系人关系: ["紧急联系人关系", "紧急联系人与本人关系"],
+    紧急联系人单位: ["紧急联系人工作单位", "紧急联系人所在单位"],
+    紧急联系人职务: ["紧急联系人职位", "紧急联系人岗位"],
     意向岗位: ["目标岗位", "应聘岗位", "申请岗位", "投递岗位"],
-    预计入职时间: ["可入职时间", "到岗时间"],
+    预计入职时间: ["可入职时间", "到岗时间", "预计报到时间"],
+    预计报到时间: ["预计入职时间", "可入职时间", "到岗时间"],
     当前薪资: ["目前薪资", "现薪资"],
     当前年收入: ["目前年收入", "现年收入", "当前年薪", "目前年薪"],
     期望工作城市: ["意向工作城市", "期望城市", "意向城市", "期望工作地点"],
     期望薪资: ["期望年薪", "期望月薪", "期望年收入", "期待薪资"],
+    期望月薪: ["月薪期望", "期望税前月薪"],
+    期望年薪: ["年薪期望", "期望年收入", "期待年收入"],
     期望年收入: ["期望薪资", "期望年薪", "期待年收入"],
+    对目标公司的期望: ["对我公司的期望", "对公司的期望", "公司期望"],
     面试城市: ["可面试城市"],
-    简历来源: ["招聘信息来源", "信息来源"],
+    简历来源: ["招聘信息来源", "信息来源", "获取招聘信息途径", "招聘信息途径"],
     即将获得最高学历: ["最高学历", "学历"],
     最高学历院校: ["最高学历学校", "毕业院校", "学校名称", "院校名称"],
     最高学历院系: ["最高学历学院", "学院名称", "院系", "院系名称"],
@@ -320,7 +349,8 @@
     学号: ["学生证号"],
     学制: ["学习年限", "几年制"],
     城市: ["所在城市", "学校城市", "地点"],
-    学校类别: ["院校类别", "学校类型"],
+    学校类别: ["院校类别", "学校类型", "毕业院校性质", "院校性质"],
+    一级学科: ["一级学科名称", "学科门类"],
     录取批次: ["高考录取批次", "招生批次"],
     专业描述: ["专业介绍"],
     专业课程: ["主修课程", "核心课程"],
@@ -412,6 +442,11 @@
     培训课程: ["培训内容", "课程内容"],
     培训获得证书: ["培训证书"],
     培训内容: ["培训描述"],
+    是否有专利或论文: ["有无专利或论文", "是否有论文或专利"],
+    发表时间: ["发布时间", "发表年月", "出版时间"],
+    发表日期: ["发布时间", "出版日期"],
+    发布年份: ["发表年份", "出版年份"],
+    是否第一作者: ["第一作者", "一作", "是否一作"],
     刊物名称: ["期刊名称", "发表刊物"],
     刊物层级: ["期刊层级"],
     论文名称: ["论文题目", "文章名称"],
@@ -445,7 +480,11 @@
     是否患有影响工作的疾病: ["是否患有传染病高血压心脏病糖尿病肾炎精神病等影响工作的疾病", "是否患有重大疾病"],
     是否在第三方企业任兼职或持有企业股权: ["是否在第三方企业任兼职或持有企业股权", "任兼职或持有企业股权"],
     是否存在曾被用人单位辞退情况: ["曾被用人单位辞退情况", "是否曾被用人单位辞退"],
-    是否享有境外长期或永久居留权: ["是否享有境外国家或地区长期或永久居留权", "境外长期或永久居留权"]
+    是否享有境外长期或永久居留权: ["是否享有境外国家或地区长期或永久居留权", "境外长期或永久居留权"],
+    求职过程中最困扰的问题: ["求职最困扰的问题", "求职困扰"],
+    个人优缺点: ["个人优势和不足", "优点和缺点", "优势与不足"],
+    岗位相关突出技能: ["与岗位相关的突出技能", "岗位相关技能", "突出技能"],
+    获取招聘信息途径: ["招聘信息来源", "招聘信息途径", "简历来源"]
   };
 
   function normalizeText(value, maxLength = 260) {
@@ -1796,10 +1835,22 @@
         .slice(0, 4)
         .map((label) => getElementText(label))
         .filter(Boolean);
-      return normalizeText(labels.join(" | "), 160);
+      return normalizeText([...new Set(labels)].join(" | "), 160);
     } catch {
       return "";
     }
+  }
+
+  function getStructuredSectionHeadingText(element) {
+    if (!(element instanceof Element)) {
+      return "";
+    }
+    const part = element.closest?.(".form-part,.form-part-new");
+    const heading = part?.querySelector(
+      ".form-part-head .head-title,.form-part-head-new .head-title,.head-title,.form-part-head,.form-part-head-new"
+    );
+    const text = getElementText(heading);
+    return text && text.length <= 180 ? text : "";
   }
 
   function getSectionText(element) {
@@ -1835,6 +1886,7 @@
       }
     };
 
+    pushText(getStructuredSectionHeadingText(element));
     pushText(getDataAttributeSectionText(element));
 
     let current = element.parentElement;
@@ -1890,16 +1942,24 @@
 
     const sections = [
       ["基本信息", /基本信息|个人信息/],
+      ["求职意向", /求职意向|应聘意向/],
       ["教育经历", /教育经历|教育背景/],
+      ["实习经历", /实习经历|工作实习经历|实践经历/],
       ["项目经历", /项目经历|项目经验|科研项目|研究项目|工程项目|实践项目|课题经历/],
       ["工作经历", /工作经历/],
       ["绩效考核", /近三年年度绩效考核|绩效考核/],
+      ["外语能力", /语言能力|外语能力|英语能力/],
       ["家庭信息", /家庭及社会关系|家庭情况|家庭信息|社会关系/],
+      ["培训经历", /培训经历|培训信息/],
+      ["论文著作", /论文\/专著|论文和专著|论文和著作|论文著作/],
+      ["专利成果", /专利成果|专利信息|专利/],
       ["证书技能", /证书信息|证书技能|资格证书/],
       ["专业资格", /专业技术资格|职业资格|职称/],
-      ["奖惩情况", /奖惩信息|奖惩情况/],
+      ["奖惩情况", /奖惩信息|奖惩情况|获奖情况|奖励情况/],
       ["自我描述", /自我评价及相关情况说明|自我评价|自我描述/],
-      ["有关声明", /有关声明/]
+      ["有关声明", /有关声明/],
+      ["网申问答", /网申问答|求职问答|开放性问题/],
+      ["其他信息", /附加信息|其他信息|补充信息/]
     ];
 
     for (const [label, pattern] of sections) {
@@ -1917,6 +1977,20 @@
         value: option.value,
         label: normalizeText(option.textContent)
       }));
+    }
+
+    if (element.matches?.(".phoenix-radio-group,.phoenix-checkbox")) {
+      return Array.from(
+        element.querySelectorAll(
+          ".phoenix-radio-group__radioItem,.phoenix-checkbox__item,[class*='phoenix-checkbox'][class*='item']"
+        )
+      )
+        .slice(0, 40)
+        .map((option) => ({
+          value: option.getAttribute("data-value") || getElementText(option),
+          label: getElementText(option)
+        }))
+        .filter((option) => option.label || option.value);
     }
 
     const ariaControls = element.getAttribute("aria-controls");
@@ -1974,6 +2048,18 @@
       return "contenteditable";
     }
 
+    if (element.matches?.(".phoenix-radio-group")) {
+      return "radio";
+    }
+
+    if (element.matches?.(".phoenix-checkbox")) {
+      return "checkbox";
+    }
+
+    if (element.matches?.(".phoenix-select__input") || element.closest?.(".phoenix-select")) {
+      return "combobox";
+    }
+
     const role = element.getAttribute("role");
     if (role === "combobox") {
       return "combobox";
@@ -2002,6 +2088,21 @@
         return element.checked ? "checked" : "";
       }
       return normalizeText(element.value || "", 260);
+    }
+
+    if (element.matches?.(".phoenix-radio-group")) {
+      const checked = element.querySelector(
+        ".phoenix-radio--checked,.phoenix-radio__circle-wrapper--checked,.phoenix-radio__radio-text--checked"
+      );
+      const item = checked?.closest?.(".phoenix-radio-group__radioItem,.phoenix-radio") || checked;
+      return normalizeText(getElementText(item), 260);
+    }
+
+    if (element.matches?.(".phoenix-checkbox")) {
+      return /--checked|\bis-checked\b/.test(String(element.className || "")) ||
+        Boolean(element.querySelector("[class*='--checked'],.is-checked"))
+        ? "checked"
+        : "";
     }
 
     if (element.isContentEditable) {
@@ -2338,9 +2439,175 @@
     return expanded;
   }
 
+  function getKnownRepeatSectionEvidence(actionElement) {
+    const directPart = actionElement?.closest?.(".form-part,.form-part-new");
+    if (directPart) {
+      return normalizeText([
+        getElementText(directPart.querySelector(".form-part-head .head-title,.form-part-head-new .head-title,.head-title")),
+        directPart.getAttribute("data-section-title"),
+        directPart.getAttribute("aria-label")
+      ].filter(Boolean).join(" | "), 260);
+    }
+
+    let current = actionElement?.parentElement || null;
+    for (let depth = 0; current && depth < 9; depth += 1, current = current.parentElement) {
+      const evidence = getLocalSectionHeadingEvidence(current);
+      if (evidence) {
+        return evidence;
+      }
+    }
+    return "";
+  }
+
+  function resolveKnownRepeatClickTarget(control) {
+    let current = control;
+    for (let depth = 0; current && depth < 3; depth += 1, current = current.parentElement) {
+      if (
+        current.matches?.("button,a,[role='button'],input[type='button']") ||
+        typeof current.onclick === "function" ||
+        window.getComputedStyle(current).cursor === "pointer"
+      ) {
+        return current;
+      }
+    }
+    return control;
+  }
+
+  function getKnownRepeatControlLabel(control) {
+    return normalizeFieldLabelText(
+      getControlContextLabel(control) ||
+        getLabelByFor(control) ||
+        getAdapterLabelText(control) ||
+        getNearbyText(control)
+    );
+  }
+
+  function countKnownRepeatRecords(root, config) {
+    if (!(root instanceof Element) || !config) {
+      return 0;
+    }
+    const anchorKeys = (config.anchorLabels || []).map(normalizeMatchKey).filter(Boolean);
+    const anchorCount = collectLogicalControls(root).filter((control) => {
+      const labelKey = normalizeMatchKey(getKnownRepeatControlLabel(control));
+      return labelKey && anchorKeys.some((anchorKey) => labelKey === anchorKey || labelKey.endsWith(anchorKey));
+    }).length;
+    const explicitCount = Array.from(
+      root.querySelectorAll("[data-record-index],[class*='record-item'],[class*='experience-item'],[class*='resume-item']")
+    ).filter((item) => isVisible(item) && collectLogicalControls(item).length > 0).length;
+    return Math.max(anchorCount, explicitCount);
+  }
+
+  function findKnownRepeatSectionRoot(actionElement, config) {
+    const directPart = actionElement?.closest?.(".form-part,.form-part-new");
+    if (directPart) {
+      return directPart;
+    }
+
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    const actionConfig = profileUtils?.getConfigForActionText?.(getButtonText(actionElement), "");
+    const hasExplicitAction = actionConfig?.sectionKey === config?.sectionKey;
+    let current = actionElement?.parentElement || null;
+    let fallback = null;
+    for (let depth = 0; current && depth < 9; depth += 1, current = current.parentElement) {
+      if (current === document.body || current === document.documentElement) {
+        break;
+      }
+      const evidence = getLocalSectionHeadingEvidence(current);
+      const evidenceConfig = profileUtils?.getConfigForActionText?.("添加", evidence);
+      if (evidenceConfig?.sectionKey === config?.sectionKey) {
+        fallback = fallback || current;
+      }
+      const recordCount = countKnownRepeatRecords(current, config);
+      if (recordCount > 0 && (hasExplicitAction || fallback)) {
+        return current;
+      }
+    }
+    return fallback;
+  }
+
+  function findKnownRepeatAddControl(config) {
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    if (!profileUtils?.getConfigForActionText || !config) {
+      return null;
+    }
+
+    const controls = Array.from(document.querySelectorAll(
+      "button,[role='button'],a,input[type='button'],.form-part-expand,[class*='form-part-expand'],[class*='add-button'],[class*='addButton'],span,div"
+    ))
+      .filter((control) => !control.closest(`#${PANEL_ID}`))
+      .filter((control) => isVisible(control) && !control.disabled && control.getAttribute("aria-disabled") !== "true")
+      .filter((control) => {
+        const text = normalizeText(getButtonText(control), 100);
+        return Boolean(text && text.length <= 80 && /添加|新增|继续添加/.test(text));
+      })
+      .sort((left, right) => left.querySelectorAll("*").length - right.querySelectorAll("*").length);
+
+    for (const control of controls) {
+      const text = getButtonText(control);
+      const sectionEvidence = getKnownRepeatSectionEvidence(control);
+      const matchedConfig = profileUtils.getConfigForActionText(text, sectionEvidence);
+      if (matchedConfig?.sectionKey !== config.sectionKey) {
+        continue;
+      }
+      const clickTarget = resolveKnownRepeatClickTarget(control);
+      const root = findKnownRepeatSectionRoot(clickTarget, config) || findKnownRepeatSectionRoot(control, config);
+      if (root) {
+        return { control: clickTarget, root };
+      }
+    }
+    return null;
+  }
+
+  async function waitForKnownRepeatRecordIncrease(config, actionControl, previousCount) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await sleep(70);
+      const action = findKnownRepeatAddControl(config);
+      const root = action?.root || findKnownRepeatSectionRoot(actionControl, config);
+      const count = countKnownRepeatRecords(root, config);
+      if (count > previousCount) {
+        return count;
+      }
+    }
+    return previousCount;
+  }
+
+  async function expandKnownProfileRepeatersForScan() {
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    if (!profileUtils?.getRepeatConfigs || !profileUtils?.getDesiredRepeatItemCount) {
+      return 0;
+    }
+
+    let expanded = 0;
+    for (const config of profileUtils.getRepeatConfigs()) {
+      const desiredCount = profileUtils.getDesiredRepeatItemCount(currentProfileV2, config);
+      for (let attempt = 0; attempt < config.maxItems && expanded < MAX_KNOWN_REPEAT_EXPANSIONS; attempt += 1) {
+        const action = findKnownRepeatAddControl(config);
+        if (!action) {
+          break;
+        }
+        const currentCount = countKnownRepeatRecords(action.root, config);
+        if (currentCount >= desiredCount) {
+          break;
+        }
+
+        clickActionElement(action.control);
+        const nextCount = await waitForKnownRepeatRecordIncrease(config, action.control, currentCount);
+        if (nextCount <= currentCount) {
+          break;
+        }
+        expanded += nextCount - currentCount;
+      }
+      if (expanded >= MAX_KNOWN_REPEAT_EXPANSIONS) {
+        break;
+      }
+    }
+    return expanded;
+  }
+
   async function scanForm() {
     currentSiteAdapter = detectSiteAdapter();
     const expandedEditCards = await expandEditableCardsForScan();
+    const expandedKnownRepeatItems = await expandKnownProfileRepeatersForScan();
     const expandedProjectItems = await expandProjectRepeatersForScan();
     const controls = collectVisibleControls();
 
@@ -2360,6 +2627,7 @@
         : null,
       scannedAt: new Date().toISOString(),
       expandedEditCards,
+      expandedKnownRepeatItems,
       expandedProjectItems,
       fields
     };
@@ -3310,6 +3578,9 @@
     if (/声明|疾病|不良|居留|任职|持股|调剂/.test(text)) {
       return "有关声明";
     }
+    if (/网申问答|求职问答|开放性问题|附加问题/.test(text)) {
+      return "网申问答";
+    }
     if (/自定义|补充/.test(text)) {
       return "自定义资料";
     }
@@ -3351,7 +3622,72 @@
         });
       }
     }
+    appendDerivedProfileEntries(entries);
     return entries;
+  }
+
+  function createDerivedProfileEntry({ label, value, category, subsection = "", itemId }) {
+    const normalizedValue = String(value == null ? "" : value).trim();
+    if (!label || !normalizedValue) {
+      return null;
+    }
+    const item = {
+      label,
+      value: normalizedValue,
+      preview: formatQuickCopyValue(normalizedValue, 96),
+      hasValue: true,
+      subsection: normalizeText(subsection, 120),
+      familyRelation: "",
+      itemId,
+      category,
+      sectionKey: category
+    };
+    item.aliases = buildProfileItemAliases({ category }, item);
+    return item;
+  }
+
+  function appendDerivedProfileEntries(entries) {
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    if (!profileUtils || !currentProfileV2) {
+      return;
+    }
+
+    const publicationAvailable = profileUtils.getPublicationAvailability?.(currentProfileV2) || "";
+    const publicationEntry = createDerivedProfileEntry({
+      label: "是否有专利或论文",
+      value: publicationAvailable,
+      category: "论文著作",
+      itemId: "profileV2.derived.publicationAvailable"
+    });
+    if (publicationEntry) {
+      entries.push(publicationEntry);
+    }
+
+    const educationItems = Array.isArray(currentProfileV2?.sections?.education?.items)
+      ? currentProfileV2.sections.education.items
+      : [];
+    const highestIndex = profileUtils.getHighestEducationIndex?.(currentProfileV2) ?? -1;
+    if (highestIndex < 0) {
+      return;
+    }
+    educationItems.forEach((item, index) => {
+      if (!profileUtils.isPopulatedItem?.(item)) {
+        return;
+      }
+      const itemPrefix = `profileV2.sections.education.items[${index}]`;
+      const subsection = entries.find((entry) => String(entry.itemId || "").startsWith(itemPrefix))?.subsection ||
+        normalizeText(item?.title || `教育经历 ${index + 1}`, 120);
+      const educationEntry = createDerivedProfileEntry({
+        label: "是否最高学历",
+        value: index === highestIndex ? "是" : "否",
+        category: "教育经历",
+        subsection,
+        itemId: `${itemPrefix}.derived.isHighestEducation`
+      });
+      if (educationEntry) {
+        entries.push(educationEntry);
+      }
+    });
   }
 
   function hasCurrentProfileData() {
@@ -3509,8 +3845,13 @@
   }
 
   function appendProfileV2Entry(section, entry) {
-    const label = normalizeText(entry.label || "", 120);
     const value = String(entry.value == null ? "" : entry.value).trim();
+    const normalizedEntryLabel = globalThis.ResumeBridgeProfileUtils?.normalizeProfileEntryLabel?.(
+      section?.category || "",
+      entry.label || "",
+      value
+    ) || entry.label || "";
+    const label = normalizeText(normalizedEntryLabel, 120);
     if (!label || !value) {
       return;
     }
@@ -3634,16 +3975,22 @@
     if (!label) {
       return "";
     }
+    if (/求职过程中最困扰|个人优缺点|优势与不足|岗位相关突出技能|获取招聘信息途径/.test(label)) {
+      return "网申问答";
+    }
+    if (/是否有专利或论文|发布年份|发表年份|发布时间|发表时间|发表日期|是否第一作者|论文名称|刊物名称/.test(label)) {
+      return "论文著作";
+    }
     if (/有关声明|声明|背景调查|永居权|永久居留|事实完全相符|违法|犯罪|行政处罚|失信|竞业|利益冲突|亲属回避/.test(label)) {
       return "有关声明";
     }
     if (/^(姓名|姓|名|英文名|性别|出生日期|出生年月|民族|国籍|政治面貌|籍贯|户籍|户口所在地|现户口所在地|现居住地|当前居住地|当前居住地详细地址|身高|体重|血型|婚姻状况|邮箱|电子邮箱|手机号码|手机号|电话|微信|微信号|QQ|证件类型|证件号码|身份证号码|护照号码|紧急联系人|紧急联系人电话|与紧急联系人关系)$/.test(label)) {
       return "基本信息";
     }
-    if (/^(最高学历|最高全日制学历|学历|学位|学校|学校名称|毕业院校|学院|学院名称|院系|专业|专业名称|培养方式|教育类型|学习形式|开始时间|结束时间|毕业时间|成绩|GPA|专业排名)$/.test(label)) {
+    if (/^(最高学历|最高全日制学历|是否最高学历|学历|学位|学校|学校名称|毕业院校|学校类别|毕业院校性质|学院|学院名称|院系|专业|专业名称|一级学科|培养方式|教育类型|学习形式|开始时间|结束时间|毕业时间|成绩|GPA|专业排名)$/.test(label)) {
       return "教育经历";
     }
-    if (/^(意向岗位|目标岗位|应聘岗位|期望工作城市|期望城市|期望薪资|期望年收入|预计入职时间|到岗时间|是否接受调剂)$/.test(label)) {
+    if (/^(意向岗位|目标岗位|应聘岗位|期望工作城市|期望城市|期望薪资|期望月薪|期望年薪|期望年收入|预计入职时间|预计报到时间|到岗时间|对目标公司的期望|对我公司的期望|是否接受调剂)$/.test(label)) {
       return "求职意向";
     }
     if (isProjectFieldContext(label)) {
@@ -3668,6 +4015,9 @@
       return "";
     }
 
+    if (/求职过程中最困扰|个人优缺点|优势与不足|岗位相关突出技能|获取招聘信息途径/.test(text)) {
+      return "网申问答";
+    }
     if (/自我评价|自我描述|自我介绍|相关情况说明/.test(text)) {
       return "自我描述";
     }
@@ -3686,7 +4036,7 @@
     if (/家庭情况|家庭信息|家庭及社会关系|社会关系|亲属信息|亲属情况|亲属关系|与本人关系|是否退休/.test(text)) {
       return "家庭信息";
     }
-    if (/求职意向|意向岗位|预计入职|期望工作城市|期望薪资|当前薪资|当前年收入|面试城市|意向城市|目标岗位|简历来源|目前工作地/.test(text)) {
+    if (/求职意向|意向岗位|预计入职|预计报到|期望工作城市|期望薪资|期望月薪|期望年薪|当前薪资|当前年收入|面试城市|意向城市|目标岗位|对我公司的期望|对目标公司的期望|简历来源|目前工作地/.test(text)) {
       return "求职意向";
     }
     if (
@@ -3832,8 +4182,8 @@
     const compatiblePairs = new Map([
       ["基本信息", ["其他信息", "教育经历"]],
       ["教育经历", ["基本信息"]],
-      ["实习经历", ["项目经历"]],
-      ["项目经历", ["实习经历"]],
+      ["实习经历", []],
+      ["项目经历", []],
       ["工作经历", ["实习经历"]],
       ["绩效考核", ["工作经历"]],
       ["社团工作", ["学生工作"]],
@@ -3874,11 +4224,12 @@
 
     const compatiblePairs = new Map([
       ["基本信息", ["其他信息", "教育经历"]],
+      ["求职意向", ["其他信息", "网申问答"]],
       ["教育经历", ["基本信息"]],
-      ["实习经历", ["项目经历", "工作经历"]],
+      ["实习经历", ["工作经历"]],
       ["工作经历", ["实习经历"]],
       ["绩效考核", ["工作经历"]],
-      ["项目经历", ["实习经历"]],
+      ["项目经历", []],
       ["社团工作", ["学生工作"]],
       ["学生工作", ["社团工作"]],
       ["专业资格", ["证书技能"]],
@@ -3887,8 +4238,9 @@
       ["计算机技能", ["证书技能", "其他信息"]],
       ["证书技能", ["外语能力", "语言能力", "计算机技能", "专业资格"]],
       ["有关声明", ["其他信息"]],
+      ["网申问答", ["求职意向", "其他信息", "自我描述"]],
       ["自我描述", ["其他信息"]],
-      ["其他信息", ["有关声明", "奖惩情况", "社团工作", "学生工作", "自我描述"]]
+      ["其他信息", ["有关声明", "奖惩情况", "社团工作", "学生工作", "自我描述", "网申问答"]]
     ]);
 
     return (compatiblePairs.get(fieldCategory) || []).includes(entryCategory);
@@ -4066,6 +4418,76 @@
     const key = normalizeMatchKey([category, text].join(" "));
     if (!key) {
       return "";
+    }
+
+    const publicationScoped = category === "论文著作" || /论文|著作|刊物|期刊|发表|发布年份|出版/.test(key);
+    if (publicationScoped) {
+      if (/是否有专利或论文|有无专利或论文|是否有论文或专利/.test(key)) {
+        return "publicationAvailable";
+      }
+      if (/是否第一作者|第一作者|是否一作|^一作$/.test(key)) {
+        return "paperFirstAuthor";
+      }
+      if (/发布年份|发表年份|出版年份|发布时间|发表时间|发表日期|出版时间|出版日期/.test(key)) {
+        return "publicationDate";
+      }
+      if (/刊物名称|期刊名称|发表刊物/.test(key)) {
+        return "publication";
+      }
+      if (/刊物层级|期刊层级/.test(key)) {
+        return "publicationLevel";
+      }
+      if (/论文名称|论文题目|文章名称/.test(key) || (category === "论文著作" && directKey === "名称")) {
+        return "paperName";
+      }
+      if (/论文描述|论文摘要|论文说明/.test(key)) {
+        return "paperDescription";
+      }
+    }
+
+    const languageScoped = ["外语能力", "语言能力"].includes(category) || /外语能力|语言能力/.test(key);
+    if (languageScoped) {
+      if (/^(分数|成绩)$/.test(directKey) || /外语分数|语言成绩/.test(key)) {
+        return "languageScore";
+      }
+      if (/证书名称技能名称|证书名称|技能名称/.test(key)) {
+        return "languageCertificate";
+      }
+      if (/外语种类|外语语种|语言类型|语种/.test(key)) {
+        return "languageType";
+      }
+      if (/掌握程度|熟练程度|语言水平|外语水平/.test(key)) {
+        return "proficiency";
+      }
+    }
+
+    const educationScoped = category === "教育经历" || /教育经历|教育背景/.test(key);
+    if (educationScoped) {
+      if (/毕业院校性质|院校性质|学校类别|院校类别|学校类型/.test(key)) {
+        return "schoolCategory";
+      }
+      if (/一级学科|学科门类/.test(key)) {
+        return "primaryDiscipline";
+      }
+      if (/是否最高学历/.test(key)) {
+        return "isHighestEducation";
+      }
+    }
+
+    if (/对目标公司的期望|对我公司的期望|对公司的期望/.test(key)) {
+      return "companyExpectation";
+    }
+    if (/求职过程中最困扰的问题|求职最困扰的问题|求职困扰/.test(key)) {
+      return "jobSearchDifficulty";
+    }
+    if (/个人优缺点|个人优势和不足|优点和缺点|优势与不足/.test(key)) {
+      return "strengthsWeaknesses";
+    }
+    if (/岗位相关突出技能|与岗位相关的突出技能|岗位相关技能|突出技能/.test(key)) {
+      return "relevantSkills";
+    }
+    if (/获取招聘信息途径|招聘信息来源|招聘信息途径|简历来源/.test(key)) {
+      return "recruitmentSource";
     }
 
     if (/是否存在亲属.*(应聘单位|本行|我行)|亲属在.*(应聘单位|本行|我行)/.test(key)) {
@@ -4776,6 +5198,10 @@
   }
 
   function getFamilyRelationFromText(value) {
+    const normalized = globalThis.ResumeBridgeProfileUtils?.normalizeFamilyRelation?.(value);
+    if (normalized) {
+      return normalized;
+    }
     const text = compactText(value);
     if (!text) {
       return "";
@@ -4796,6 +5222,14 @@
       return "子女";
     }
     return "";
+  }
+
+  function familyRelationsMatch(left, right) {
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    if (profileUtils?.familyRelationsMatch) {
+      return profileUtils.familyRelationsMatch(left, right);
+    }
+    return Boolean(left && right && left === right);
   }
 
   function getFieldFamilyRelation(field) {
@@ -4844,7 +5278,10 @@
 
     const fieldRelation = getFieldFamilyRelation(field);
     const entryRelation = getEntryFamilyRelation(entry);
-    return Boolean(fieldRelation && entryRelation && fieldRelation === entryRelation);
+    if (!fieldRelation) {
+      return Boolean(entryRelation);
+    }
+    return Boolean(entryRelation && familyRelationsMatch(fieldRelation, entryRelation));
   }
 
   function getFamilyRelationMatchBonus(field, entry, fieldCategory) {
@@ -4863,10 +5300,13 @@
 
     const fieldRelation = getFieldFamilyRelation(field);
     const entryRelation = getEntryFamilyRelation(entry);
-    if (!fieldRelation || !entryRelation) {
+    if (!entryRelation) {
       return -999;
     }
-    return fieldRelation === entryRelation ? 18 : -999;
+    if (!fieldRelation) {
+      return 0;
+    }
+    return familyRelationsMatch(fieldRelation, entryRelation) ? 18 : -999;
   }
 
   function getElementByFieldRuntimeId(field) {
@@ -4941,8 +5381,16 @@
   }
 
   function isSemanticallyIncompatible(field, entry, fieldLabel, fieldCategory) {
+    const profileUtils = globalThis.ResumeBridgeProfileUtils;
+    if (profileUtils?.isFieldValueShapeCompatible && !profileUtils.isFieldValueShapeCompatible(fieldLabel, entry?.label, entry?.value)) {
+      return true;
+    }
+
     const fieldBucket = getFieldSemanticBucket(field, fieldLabel, fieldCategory);
     const entryBucket = getEntrySemanticBucket(entry);
+    if (STRICT_SEMANTIC_BUCKETS.has(fieldBucket) && fieldBucket !== entryBucket) {
+      return true;
+    }
 
     if (areSemanticBucketsCompatible(fieldBucket, entryBucket)) {
       return false;
@@ -4952,8 +5400,12 @@
   }
 
   function getEntryOccurrenceIndex(entry) {
+    const itemIdMatch = String(entry?.itemId || "").match(/\.items\[(\d+)\]/);
+    if (itemIdMatch) {
+      return Number(itemIdMatch[1]) + 1;
+    }
     const text = normalizeText([entry?.subsection, entry?.category].filter(Boolean).join(" "), 120);
-    const match = text.match(/(?:经历|信息|证书|奖惩|家庭|教育|工作\/实习|实习|项目|社团|学生工作)?\s*(\d+)/);
+    const match = text.match(/(?:经历|信息|证书|奖惩|家庭|教育|工作\/实习|实习|项目|社团|学生工作|论文(?:和)?著作|论文专著|外语能力|语言能力|培训|专利)\s*(\d+)/);
     if (!match) {
       return 0;
     }
@@ -5012,7 +5464,18 @@
       return true;
     }
 
-    if (["家庭信息", "绩效考核", "教育经历", "实习经历", "工作经历", "项目经历"].includes(fieldCategory)) {
+    if ([
+      "家庭信息",
+      "绩效考核",
+      "教育经历",
+      "实习经历",
+      "工作经历",
+      "项目经历",
+      "论文著作",
+      "专利成果",
+      "外语能力",
+      "语言能力"
+    ].includes(fieldCategory)) {
       return true;
     }
 
@@ -5118,6 +5581,15 @@
     if (fieldBucket && entryBucket && fieldBucket === entryBucket) {
       score += 8;
     }
+    if (fieldBucket === "publicationDate" && entryBucket === "publicationDate") {
+      const dateParts = globalThis.ResumeBridgeDateUtils?.parseDateParts?.(entry.value) || {};
+      const publicationFieldLabel = normalizeMatchKey(fieldLabel);
+      if (/发布时间|发表日期|出版日期/.test(publicationFieldLabel) && !/年份/.test(publicationFieldLabel)) {
+        score += dateParts.day ? 20 : -12;
+      } else if (/发布年份|发表年份|出版年份/.test(publicationFieldLabel) && dateParts.year) {
+        score += 6;
+      }
+    }
     score += relationBonus;
     score += textMatchScore(fieldText, entry.category) * 2;
     score += textMatchScore(fieldText, entry.subsection) * 8;
@@ -5157,7 +5629,7 @@
     const labelText = compactText([field?.inferredLabel || inferFieldLabel(field), field?.label, field?.placeholder].join(" "));
     const optionText = getFieldOptionLabelsText(field, 160);
     const contextText = compactText([field?.nearbyText, field?.section, field?.groupText, optionText].join(" "));
-    if (/开始时间|起始时间|起始日期|开始日期|结束时间|结束日期|截止时间|截止日期|出生日期|出生年月|取得毕业证时间|获取日期|取得时间|竞赛时间|获得时间|有效期/.test(labelText)) {
+    if (/开始时间|起始时间|起始日期|开始日期|结束时间|结束日期|截止时间|截止日期|出生日期|出生年月|取得毕业证时间|获取日期|取得时间|竞赛时间|获得时间|发表时间|发布时间|发布年份|发表年份|出版时间|出版日期|有效期/.test(labelText)) {
       return "date";
     }
     if (/是否|有无|能否|接受|服从|未参加|参加过|长期有效|填写有效期/.test(labelText)) {
@@ -5171,7 +5643,7 @@
     }
     if (
       !labelText &&
-      /开始时间|起始时间|起始日期|开始日期|结束时间|结束日期|截止时间|截止日期|出生日期|出生年月|取得毕业证时间|获取日期|取得时间|竞赛时间|获得时间|有效期/.test(contextText)
+      /开始时间|起始时间|起始日期|开始日期|结束时间|结束日期|截止时间|截止日期|出生日期|出生年月|取得毕业证时间|获取日期|取得时间|竞赛时间|获得时间|发表时间|发布时间|发布年份|发表年份|出版时间|出版日期|有效期/.test(contextText)
     ) {
       return "date";
     }
@@ -5456,6 +5928,8 @@
       scan: {
         fieldCount: fields.length,
         expandedEditCards: Number(plan.scan?.expandedEditCards || 0),
+        expandedKnownRepeatItems: Number(plan.scan?.expandedKnownRepeatItems || 0),
+        expandedProjectItems: Number(plan.scan?.expandedProjectItems || 0),
         siteAdapter: plan.scan?.siteAdapter || null,
         fields
       },
@@ -6090,6 +6564,10 @@
 
     if (candidate?.writeMode === "date") {
       const dateValue = normalizeDateValue(value);
+      const phoenixDateResult = await tryFillPhoenixDatePicker(element, dateValue);
+      if (phoenixDateResult.handled) {
+        return phoenixDateResult;
+      }
       if (element instanceof HTMLInputElement && ["date", "month", "datetime-local"].includes(element.type)) {
         setNativeValue(element, dateValue);
         return element.value === dateValue
@@ -6106,14 +6584,22 @@
         return tryFillCustomChoiceField(element, dateValue, field);
       }
       setNativeValue(element, dateValue);
-      return { ok: true };
+      await sleep(0);
+      return valuesLookEquivalent(getControlCurrentValue(element), dateValue)
+        ? { ok: true }
+        : { ok: false, reason: "日期写入后未被页面接受" };
     }
 
     if (element instanceof HTMLInputElement && ["checkbox", "radio"].includes(element.type)) {
       return fillBooleanOrRadioChoice(element, value, field, candidate);
     }
 
-    if (element.getAttribute("role") === "radio" || element.getAttribute("role") === "checkbox") {
+    if (
+      type === "radio" ||
+      type === "checkbox" ||
+      element.getAttribute("role") === "radio" ||
+      element.getAttribute("role") === "checkbox"
+    ) {
       return fillRoleChoice(element, value, field, candidate);
     }
 
@@ -6126,18 +6612,26 @@
       const textInput = element.querySelector?.('input:not([type="hidden"]),textarea,[contenteditable="true"]');
       if (textInput && textInput !== element) {
         setNativeValue(textInput, value);
-        return { ok: true, warning: "combobox fallback wrote into inner input only" };
+        await sleep(0);
+        return valuesLookEquivalent(getControlCurrentValue(textInput), value)
+          ? { ok: false, reason: "下拉框只写入了搜索文本，未确认选项" }
+          : { ok: false, reason: "下拉框未接受输入" };
       }
     }
 
     if (element instanceof HTMLSelectElement) {
       const matched = setSelectValue(element, value);
-      return { ok: true, warning: matched ? "" : "下拉选项需要手动确认，已尝试按原值填写" };
+      return matched
+        ? { ok: true }
+        : { ok: false, reason: "未找到匹配的下拉选项" };
     }
 
     if (element.isContentEditable) {
       setContentEditableValue(element, value);
-      return { ok: true };
+      await sleep(0);
+      return valuesLookEquivalent(getControlCurrentValue(element), value)
+        ? { ok: true }
+        : { ok: false, reason: "富文本字段未接受输入" };
     }
 
     if (isChoiceField) {
@@ -6149,7 +6643,10 @@
 
     element.focus();
     setNativeValue(element, value);
-    return { ok: true };
+    await sleep(0);
+    return valuesLookEquivalent(getControlCurrentValue(element), value)
+      ? { ok: true }
+      : { ok: false, reason: "字段写入后未被页面接受" };
   }
 
   function resolveEditableTarget(element) {
@@ -6175,11 +6672,37 @@
     return input || element;
   }
 
-  function fillRoleChoice(element, value, field, candidate) {
-    const role = element.getAttribute("role");
+  function getSelectedRoleChoiceTexts(root) {
+    return Array.from(root.querySelectorAll(
+      'input:checked,[aria-checked="true"],.phoenix-radio--checked,.phoenix-checkbox--checked,[class*="circle-wrapper--checked"],[class*="checkbox"][class*="--checked"]'
+    )).map((selected) => {
+      const item = selected.closest?.(
+        ".phoenix-radio-group__radioItem,.phoenix-checkbox__item,label,[role='radio'],[role='checkbox']"
+      ) || selected;
+      return normalizeText(getElementText(item) || getChoiceLabelText(selected) || selected.getAttribute?.("aria-label"), 120);
+    }).filter(Boolean);
+  }
+
+  async function waitForRoleChoiceSelection(root, target) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const selectedTexts = getSelectedRoleChoiceTexts(root);
+      if (selectedTexts.some((text) => choiceTextMatches(text, target))) {
+        return true;
+      }
+      await sleep(45);
+    }
+    return false;
+  }
+
+  async function fillRoleChoice(element, value, field, candidate) {
+    const role = element.getAttribute("role") || getControlType(element);
     const target = normalizeChoiceValue(value, candidate?.fieldLabel || field?.label || "");
     const root = findChoiceFieldContainer(element);
-    const options = Array.from(root.querySelectorAll('[role="radio"],[role="checkbox"],label,button,[class*="radio"],[class*="checkbox"]'));
+    const options = Array.from(
+      root.querySelectorAll(
+        '[role="radio"],[role="checkbox"],label,button,.phoenix-radio-group__radioItem,.phoenix-checkbox__item,[class*="radio"],[class*="checkbox"]'
+      )
+    );
     const matched = options.find((option) => {
       const text = getElementText(option);
       return choiceTextMatches(text, target) || choiceTextMatches(option.getAttribute("aria-label") || "", target);
@@ -6187,26 +6710,31 @@
 
     if (matched) {
       clickActionElement(matched);
-      return { ok: true };
+      const accepted = await waitForRoleChoiceSelection(root, target);
+      return accepted
+        ? { ok: true }
+        : { ok: false, reason: "点击单选项后页面未保留所选值" };
     }
 
     if (role === "checkbox" && /^(是|yes|true|1|on)$/i.test(target)) {
       clickActionElement(element);
-      return { ok: true };
-    }
-
-    if (role === "radio") {
-      clickActionElement(element);
-      return { ok: true };
+      const accepted = await waitForRoleChoiceSelection(root, target);
+      return accepted
+        ? { ok: true }
+        : { ok: false, reason: "点击复选项后页面未保留所选值" };
     }
 
     return { ok: false, reason: "no matching role choice found" };
   }
 
-  function fillBooleanOrRadioChoice(element, value, field, candidate) {
+  async function fillBooleanOrRadioChoice(element, value, field, candidate) {
     if (element instanceof HTMLInputElement && element.type === "checkbox") {
       setCheckboxOrRadio(element, value);
-      return { ok: true };
+      await sleep(0);
+      const shouldCheck = /^(是|yes|true|1|on)$/i.test(normalizeChoiceValue(value));
+      return element.checked === shouldCheck
+        ? { ok: true }
+        : { ok: false, reason: "复选框未接受目标状态" };
     }
 
     if (!(element instanceof HTMLInputElement) || element.type !== "radio") {
@@ -6237,7 +6765,10 @@
 
     matched.click();
     matched.dispatchEvent(new Event("change", { bubbles: true }));
-    return { ok: true };
+    await sleep(0);
+    return matched.checked
+      ? { ok: true }
+      : { ok: false, reason: "单选框未接受目标选项" };
   }
 
   function getChoiceLabelText(element) {
@@ -6315,6 +6846,134 @@
     return text;
   }
 
+  function getPhoenixDatePickerContainer(element) {
+    const container = element?.closest?.(".phoenix-select");
+    if (!container) {
+      return null;
+    }
+    const hasDateIcon = Array.from(container.querySelectorAll("use")).some((icon) => {
+      const href = icon.getAttribute("href") || icon.getAttribute("xlink:href") || "";
+      return /field_date_time_picker|date.*picker/i.test(href);
+    });
+    return hasDateIcon ? container : null;
+  }
+
+  function getClosestVisiblePhoenixCalendar(trigger) {
+    const calendars = Array.from(document.querySelectorAll(".phoenix-calendar")).filter(isVisible);
+    return calendars.length > 0 ? chooseClosestChoiceRoot(calendars, trigger) : null;
+  }
+
+  function readPhoenixCalendarMonth(calendar) {
+    const yearText = getElementText(calendar?.querySelector?.(".phoenix-calendar-year-select"));
+    const monthText = getElementText(calendar?.querySelector?.(".phoenix-calendar-month-select"));
+    const year = Number((yearText.match(/\d{4}/) || [])[0]);
+    const month = Number((monthText.match(/\d{1,2}/) || [])[0]);
+    return {
+      year: Number.isFinite(year) ? year : 0,
+      month: Number.isFinite(month) ? month : 0
+    };
+  }
+
+  async function waitForControlValueMatch(element, target, attempts = 8) {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (valuesLookEquivalent(getControlCurrentValue(element), target)) {
+        return true;
+      }
+      await sleep(50);
+    }
+    return false;
+  }
+
+  async function tryFillPhoenixDatePicker(element, value) {
+    const container = getPhoenixDatePickerContainer(element);
+    if (!container) {
+      return { handled: false, ok: false };
+    }
+
+    const dateParts = globalThis.ResumeBridgeDateUtils?.parseDateParts?.(value) || {};
+    const targetYear = Number(dateParts.year);
+    const targetMonth = Number(dateParts.month);
+    const targetDay = Number(dateParts.day);
+    if (!targetYear || !targetMonth || !targetDay) {
+      return {
+        handled: true,
+        ok: false,
+        reason: "该日期控件需要完整年月日，资料中缺少具体日期"
+      };
+    }
+
+    clickActionElement(element);
+    let calendar = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      calendar = getClosestVisiblePhoenixCalendar(element);
+      if (calendar) {
+        break;
+      }
+      await sleep(45);
+    }
+    if (!calendar) {
+      return { handled: true, ok: false, reason: "未能打开日期选择器" };
+    }
+
+    let positioned = false;
+    for (let attempt = 0; attempt < 160; attempt += 1) {
+      calendar = getClosestVisiblePhoenixCalendar(element) || calendar;
+      const current = readPhoenixCalendarMonth(calendar);
+      if (!current.year || !current.month) {
+        break;
+      }
+      if (current.year === targetYear && current.month === targetMonth) {
+        positioned = true;
+        break;
+      }
+
+      let selector = "";
+      if (current.year !== targetYear) {
+        selector = current.year > targetYear
+          ? ".phoenix-calendar-prev-year-btn"
+          : ".phoenix-calendar-next-year-btn";
+      } else {
+        selector = current.month > targetMonth
+          ? ".phoenix-calendar-prev-month-btn"
+          : ".phoenix-calendar-next-month-btn";
+      }
+      const navigationControl = calendar.querySelector(selector);
+      if (!navigationControl) {
+        break;
+      }
+      clickActionElement(navigationControl);
+      await sleep(35);
+    }
+
+    if (!positioned) {
+      closeChoicePopup(element);
+      return { handled: true, ok: false, reason: "日期选择器无法定位到目标年月" };
+    }
+
+    calendar = getClosestVisiblePhoenixCalendar(element) || calendar;
+    const dayControl = Array.from(calendar.querySelectorAll("td.phoenix-calendar-cell"))
+      .filter((cell) => !cell.classList.contains("phoenix-calendar-last-month-cell"))
+      .filter((cell) => !cell.classList.contains("phoenix-calendar-next-month-btn-day"))
+      .map((cell) => cell.querySelector(".phoenix-calendar-date"))
+      .find((day) =>
+        day &&
+        day.getAttribute("aria-disabled") !== "true" &&
+        Number(getElementText(day)) === targetDay
+      );
+    if (!dayControl) {
+      closeChoicePopup(element);
+      return { handled: true, ok: false, reason: "日期选择器中没有目标日期" };
+    }
+
+    clickActionElement(dayControl);
+    const accepted = await waitForControlValueMatch(element, value);
+    if (!accepted) {
+      closeChoicePopup(element);
+      return { handled: true, ok: false, reason: "选择日期后页面未接受该值" };
+    }
+    return { handled: true, ok: true };
+  }
+
   function choiceTextMatches(label, target) {
     const dateUtils = globalThis.ResumeBridgeDateUtils;
     const leftNumeric = dateUtils?.normalizeNumericChoiceToken?.(label) || "";
@@ -6331,6 +6990,40 @@
     return left === right || left.includes(right) || right.includes(left);
   }
 
+  function getReadableChoiceValues(element, container) {
+    const values = new Set();
+    const add = (value) => {
+      const text = normalizeText(value, 160);
+      if (text && !/^(请选择|请先选择|选择)$/.test(text)) {
+        values.add(text);
+      }
+    };
+
+    add(getControlCurrentValue(element));
+    for (const input of Array.from(container?.querySelectorAll?.('input:not([type="hidden"]),textarea') || [])) {
+      add(getControlCurrentValue(input));
+    }
+    for (const selected of Array.from(container?.querySelectorAll?.(
+      '[aria-selected="true"],[aria-checked="true"],.phoenix-select__tipEle,.phoenix-select__calcEle,[class*="--selected"],[class*="is-selected"]'
+    ) || [])) {
+      add(getElementText(selected));
+      add(selected.getAttribute("data-value"));
+      add(selected.getAttribute("aria-label"));
+    }
+    return Array.from(values);
+  }
+
+  async function waitForChoiceSelection(element, container, target) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const values = getReadableChoiceValues(element, container);
+      if (values.some((current) => choiceTextMatches(current, target))) {
+        return true;
+      }
+      await sleep(50);
+    }
+    return false;
+  }
+
   async function tryFillCustomChoiceField(element, value, field) {
     const container = findChoiceFieldContainer(element);
     if (!container) {
@@ -6340,7 +7033,13 @@
     container.scrollIntoView({ block: "center", inline: "nearest" });
     const optionRoot = await openChoicePopup(element, container);
 
-    const target = normalizeChoiceValue(value, inferFieldLabel(field));
+    const rawTarget = normalizeChoiceValue(value, inferFieldLabel(field));
+    const optionScope = optionRoot || document;
+    const optionLabels = findVisibleChoiceOptions(optionScope, optionScope === document).map((option) => getElementText(option));
+    const fieldLabel = inferFieldLabel(field);
+    const target = /关系|亲属/.test(normalizeMatchKey(fieldLabel))
+      ? globalThis.ResumeBridgeProfileUtils?.projectFamilyRelationChoice?.(rawTarget, optionLabels) || rawTarget
+      : rawTarget;
     const hierarchicalResult = await tryFillHierarchicalChoiceOptions(value, target);
     if (hierarchicalResult.ok) {
       return hierarchicalResult;
@@ -6350,8 +7049,10 @@
 
     if (matched) {
       clickActionElement(matched);
-      await sleep(70);
-      return { ok: true };
+      const accepted = await waitForChoiceSelection(element, container, target);
+      return accepted
+        ? { ok: true }
+        : { ok: false, reason: "点击选项后页面未保留所选值" };
     }
 
     const searchInput =
@@ -6359,14 +7060,16 @@
         ? element
         : container.querySelector?.('input:not([type="hidden"]),textarea,[contenteditable="true"]');
     if (searchInput) {
-      setNativeValue(searchInput, value);
+      setNativeValue(searchInput, target);
       await sleep(100);
       const retryRoot = resolveChoiceOptionRoot(element, container) || optionRoot || document;
       const retryMatched = await findChoiceOptionWithScroll(retryRoot, target);
       if (retryMatched) {
         clickActionElement(retryMatched);
-        await sleep(70);
-        return { ok: true };
+        const accepted = await waitForChoiceSelection(element, container, target);
+        return accepted
+          ? { ok: true }
+          : { ok: false, reason: "搜索并点击选项后页面未保留所选值" };
       }
     }
 
@@ -6402,7 +7105,7 @@
     }
 
     const localPopup = container?.querySelector?.(
-      '[role="listbox"],[role="menu"],.ant-select-dropdown,.rc-select-dropdown,.el-select-dropdown,[class*="dropdown-menu"],[class*="select-dropdown"]'
+      '[role="listbox"],[role="menu"],.ant-select-dropdown,.rc-select-dropdown,.el-select-dropdown,.phoenix-select-dropdown,.phoenix-select__dropdown,.phoenix-selectList,.phoenix-selectList__virtualList-holder,[class*="phoenix-select"][class*="dropdown"],[class*="phoenix-select"][class*="options"],[class*="dropdown-menu"],[class*="select-dropdown"]'
     );
     if (localPopup && isVisible(localPopup) && findVisibleChoiceOptions(localPopup, false).length > 0) {
       return localPopup;
@@ -6414,6 +7117,12 @@
       ".ant-select-dropdown",
       ".rc-select-dropdown",
       ".el-select-dropdown",
+      ".phoenix-select-dropdown",
+      ".phoenix-select__dropdown",
+      ".phoenix-selectList",
+      ".phoenix-selectList__virtualList-holder",
+      '[class*="phoenix-select"][class*="dropdown"]',
+      '[class*="phoenix-select"][class*="options"]',
       '[class*="select-dropdown"]',
       '[class*="dropdown-menu"]',
       '[class*="picker-dropdown"]'
@@ -6426,7 +7135,7 @@
 
     const inferredRoots = findVisibleChoiceOptions(document, false)
       .map((option) => option.closest?.(
-        '[role="listbox"],[role="menu"],ul,ol,[class*="dropdown"],[class*="menu"],[class*="popup"],[class*="options"]'
+        '[role="listbox"],[role="menu"],ul,ol,[class*="selectList"],[class*="dropdown"],[class*="menu"],[class*="popup"],[class*="options"]'
       ) || option.parentElement)
       .filter((root, index, array) =>
         root &&
@@ -6544,12 +7253,9 @@
   }
 
   function findChoiceFieldContainer(element) {
-    const adapterSelectors = getAdapterSelectors();
-    if (adapterSelectors.containerSelector) {
-      const container = element.closest(adapterSelectors.containerSelector);
-      if (container) {
-        return container;
-      }
+    const phoenixContainer = element.closest?.(".phoenix-select,.phoenix-radio-group,.phoenix-checkbox");
+    if (phoenixContainer) {
+      return phoenixContainer;
     }
 
     let current = element;
@@ -6561,6 +7267,15 @@
         return current;
       }
     }
+
+    const adapterSelectors = getAdapterSelectors();
+    if (adapterSelectors.containerSelector) {
+      const container = element.closest(adapterSelectors.containerSelector);
+      if (container) {
+        return container;
+      }
+    }
+
     return element.parentElement || element;
   }
 
@@ -6573,6 +7288,12 @@
       ".rc-select-item-option",
       ".ant-cascader-menu-item",
       ".ant-picker-cell",
+      ".phoenix-select-option",
+      ".phoenix-select__option",
+      ".phoenix-select__optionItem",
+      ".phoenix-selectList__listItem",
+      ".phoenix-radio-group__radioItem",
+      '[class*="phoenix-select"][class*="option"]',
       '[class*="option"]',
       '[class*="Option"]',
       '[class*="select-item"]',
@@ -7143,37 +7864,151 @@
     return element;
   }
 
-  function getJobPageInfo() {
+  async function getJobPageInfo() {
     const tracker = globalThis.ResumeBridgeJobTracker;
     if (!tracker?.resolveJobPageInfo) {
       throw new Error("Job tracker module is unavailable.");
     }
 
-    const jobTitleCandidates = [
-      ...collectJobTrackerCandidates('[itemprop="title"]', 92, "itemprop"),
-      ...collectJobTrackerCandidates('[data-testid*="job-title"], [data-testid*="jobTitle"]', 88, "data-testid"),
-      ...collectJobTrackerCandidates('[class*="job-title"], [class*="jobTitle"], [class*="position-name"], [class*="positionName"]', 80, "class"),
-      ...collectJobTrackerCandidates('h1', 68, "h1"),
-      ...collectJobTrackerMetaCandidates('meta[property="og:title"], meta[name="twitter:title"]', 42, "meta")
-    ];
-    const companyCandidates = [
-      ...collectJobTrackerCandidates('[itemprop="hiringOrganization"] [itemprop="name"], [itemprop="hiringOrganization"]', 94, "itemprop"),
-      ...collectJobTrackerCandidates('[data-testid*="company-name"], [data-testid*="companyName"]', 88, "data-testid"),
-      ...collectJobTrackerCandidates('[class*="company-name"], [class*="companyName"], [class*="employer-name"], [class*="employerName"]', 82, "class"),
-      ...collectJobTrackerMetaCandidates('meta[property="og:site_name"], meta[name="application-name"]', 24, "meta")
-    ];
+    const siteCandidates = await collectSiteJobTrackerCandidates(tracker);
+    const isApplicationForm = isLikelyJobApplicationForm();
+    const jobTitleCandidates = [...siteCandidates.jobTitleCandidates];
+    const companyCandidates = [...siteCandidates.companyCandidates];
+
+    if (!isApplicationForm) {
+      jobTitleCandidates.push(
+        ...collectJobTrackerCandidates('[itemprop="title"]', 92, "itemprop"),
+        ...collectJobTrackerCandidates('[data-testid*="job-title"], [data-testid*="jobTitle"]', 88, "data-testid"),
+        ...collectJobTrackerCandidates('[class*="job-title"], [class*="jobTitle"], [class*="position-name"], [class*="positionName"]', 80, "class"),
+        ...collectJobTrackerCandidates("h1", 68, "h1"),
+        ...collectJobTrackerMetaCandidates('meta[property="og:title"], meta[name="twitter:title"]', 42, "meta")
+      );
+      companyCandidates.push(
+        ...collectJobTrackerCandidates('[itemprop="hiringOrganization"] [itemprop="name"], [itemprop="hiringOrganization"]', 94, "itemprop"),
+        ...collectJobTrackerCandidates('[data-testid*="company-name"], [data-testid*="companyName"]', 88, "data-testid"),
+        ...collectJobTrackerCandidates('[class*="company-name"], [class*="companyName"], [class*="employer-name"], [class*="employerName"]', 82, "class"),
+        ...collectJobTrackerMetaCandidates('meta[property="og:site_name"], meta[name="application-name"]', 24, "meta")
+      );
+    }
+
+    const resolved = tracker.resolveJobPageInfo({
+      url: location.href,
+      hostname: location.hostname,
+      pageTitle: isApplicationForm ? "" : document.title,
+      jobPostings: collectJobPostingStructuredData(),
+      companyCandidates,
+      jobTitleCandidates
+    });
+    const channel = tracker.inferApplicationChannel?.(resolved.sourceUrl, resolved.sourceSite) || "";
+    const candidates = tracker.extractApplicationListCandidates?.({
+      lines: collectApplicationTrackerLines(),
+      companyName: resolved.companyName,
+      sourceUrl: resolved.sourceUrl,
+      sourceSite: resolved.sourceSite,
+      channel
+    }) || [];
 
     return {
-      ...tracker.resolveJobPageInfo({
-        url: location.href,
-        hostname: location.hostname,
-        pageTitle: document.title,
-        jobPostings: collectJobPostingStructuredData(),
-        companyCandidates,
-        jobTitleCandidates
-      }),
+      ...resolved,
+      channel,
+      statusUrl: resolved.sourceUrl,
+      candidates,
       detectedAt: new Date().toISOString()
     };
+  }
+
+  async function collectSiteJobTrackerCandidates(tracker) {
+    const candidates = {
+      companyCandidates: [],
+      jobTitleCandidates: []
+    };
+    const hostname = location.hostname.toLowerCase();
+    const jobAdId = new URL(location.href).searchParams.get("jobAdId") || "";
+
+    if (hostname === "career.naura.com") {
+      candidates.companyCandidates.push({ value: "北方华创", score: 72, source: "naura-site" });
+    }
+
+    if (!isBeisenRecruitmentPortal() || !isSafeJobAdId(jobAdId)) {
+      return candidates;
+    }
+
+    const detailTitleCandidates = collectJobTrackerCandidates(
+      '[class*="STJobName"] span',
+      96,
+      "beisen-job-detail"
+    ).map((candidate) => ({
+      ...candidate,
+      value: tracker?.extractJobTitleFromPostingName
+        ? tracker.extractJobTitleFromPostingName(candidate.value, hostname === "career.naura.com" ? "北方华创" : "")
+        : candidate.value
+    }));
+    candidates.jobTitleCandidates.push(...detailTitleCandidates);
+
+    if (!tracker?.extractBeisenJobPageInfo) {
+      return candidates;
+    }
+
+    const endpoint = new URL("/api/JobAd/GetJobAdInfo", location.origin);
+    endpoint.searchParams.set("jobAdId", jobAdId);
+    endpoint.searchParams.set("displayFields", JSON.stringify(["JobAdName", "Org"]));
+
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : 0;
+    try {
+      const response = await fetch(endpoint.href, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+        signal: controller?.signal
+      });
+      if (!response.ok) {
+        return candidates;
+      }
+
+      const resolved = tracker.extractBeisenJobPageInfo(await response.json());
+      if (resolved.companyName) {
+        candidates.companyCandidates.push({
+          value: resolved.companyName,
+          score: 100,
+          source: "beisen-job-api"
+        });
+      }
+      if (resolved.jobTitle) {
+        candidates.jobTitleCandidates.push({
+          value: resolved.jobTitle,
+          score: 100,
+          source: "beisen-job-api"
+        });
+      }
+    } catch {
+      // A failed read-only lookup must leave the field blank instead of falling back to form noise.
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    return candidates;
+  }
+
+  function isBeisenRecruitmentPortal() {
+    if (location.hostname.toLowerCase() === "career.naura.com") {
+      return true;
+    }
+
+    return Array.from(document.scripts)
+      .slice(0, 60)
+      .some((script) => /bstatics\.com\/ux\/ux-recruitment-portal/i.test(String(script.src || "")));
+  }
+
+  function isSafeJobAdId(value) {
+    return /^(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[1-9]\d{3,20})$/i.test(String(value || ""));
+  }
+
+  function isLikelyJobApplicationForm() {
+    const path = location.pathname.toLowerCase();
+    return /(?:^|\/)(?:apply|application|resume|form)(?:\/|$)/.test(path);
   }
 
   function collectJobPostingStructuredData() {
@@ -7202,13 +8037,19 @@
     }
 
     return elements
-      .filter((element) => isVisible(element))
+      .filter((element) => isVisible(element) && !isJobTrackerEditableControl(element))
       .map((element) => ({
-        value: normalizeTrackerSignalText(element.getAttribute("content") || element.value || element.textContent),
+        value: normalizeTrackerSignalText(element.getAttribute("content") || element.textContent),
         score,
         source
       }))
       .filter((candidate) => candidate.value);
+  }
+
+  function isJobTrackerEditableControl(element) {
+    return Boolean(
+      element?.matches?.('input, textarea, select, option, [contenteditable="true"], [contenteditable="plaintext-only"]')
+    );
   }
 
   function collectJobTrackerMetaCandidates(selector, score, source) {
@@ -7233,6 +8074,18 @@
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 300);
+  }
+
+  function collectApplicationTrackerLines() {
+    const text = String(document.body?.innerText || document.body?.textContent || "").slice(0, 300000);
+    if (!/投递时间|申请时间|提交时间|Requisition ID:|Applied On:/i.test(text)) {
+      return [];
+    }
+    return text
+      .split(/\r?\n+/)
+      .map(normalizeTrackerSignalText)
+      .filter(Boolean)
+      .slice(0, 1500);
   }
 
   async function handleContentMessage(message) {

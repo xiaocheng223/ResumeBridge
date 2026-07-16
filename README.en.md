@@ -33,8 +33,8 @@ Version **0.1.0 is a developer preview** intended for local evaluation, testing,
 | Fill performance | High-confidence fields are resolved locally first; only ambiguous fields reach AI, with at most one compact mapping request per run |
 | Complex date controls | Supports split start/end year-month groups and option lookup in common scrollable custom dropdowns |
 | Repeated projects | Recognizes project-experience and research-project sections, fills in local profile order, and invokes bounded add actions only inside verified project sections |
-| Application tracking | Extracts user-confirmed company and role candidates, then stores application time, status, notes, filters, editing, and CSV export locally |
-| Verification | The current suite contains 39 automated tests; Edge extension smoke coverage includes conservative filling, date dropdowns, two project records, tracking, and privacy boundaries |
+| Application tracking | Extracts user-confirmed company and role candidates, then stores channel, application time, pipeline status, status-update time, and notes with filtering, sorting, inline updates, and CSV import/export |
+| Verification | Automated coverage includes conservative filling, date dropdowns, project records, tracking, CSV compatibility, and extension privilege boundaries |
 
 Fixtures prevent regressions in known behavior; they are not a permanent compatibility guarantee for every recruiting site. Review every field before submission.
 
@@ -71,7 +71,7 @@ flowchart LR
 | Optional AI mapping | Runs local matching first, then sends at most one bounded compact request for unresolved or low-confidence fields without sending local profile values |
 | Safety controls | Preserves existing values by default and excludes sensitive, declaration, upload, and submit controls |
 | Human review | Separates filled and pending fields; final submission always remains manual |
-| Application tracking | Detects company and role from the active recruiting page, then stores user-confirmed time, status, and notes with filtering, editing, and CSV export |
+| Application tracking | Detects company and role from the active recruiting page, then stores channel, time, status-page URL, pipeline status, and status-update time with filtering, sorting, inline status updates, and two-way CSV migration |
 | Migration | Imports legacy OpenJobAutofill backups and exports the ResumeBridge backup format |
 
 Recruiting pages change frequently. A listed heuristic is not a permanent compatibility guarantee. Unrecognized controls should remain pending instead of being filled aggressively.
@@ -90,7 +90,8 @@ Recruiting pages change frequently. A listed heuristic is not a permanent compat
 ### Local data boundary
 
 - Profile and API settings are stored in `chrome.storage.local`, not browser sync storage.
-- Application history is also local-only. Source URLs are stored without queries or fragments, reducing retention of common query tokens.
+- Application history is also local-only. Job and status-page URLs are stored without queries or fragments, reducing retention of common query tokens.
+- CSV files are parsed locally in the extension page. Bulk writes are restricted to trusted extension pages, and exported cells guard against common spreadsheet-formula prefixes.
 - Recruiting-page content scripts can suggest company and role values but cannot read, change, or delete application history.
 - API keys, headers, and request templates are available only to trusted extension pages, not recruiting-page content scripts.
 - The in-page quick-copy panel uses a closed shadow root to reduce direct inspection of profile text that has not been written to the form.
@@ -133,8 +134,8 @@ Import [sample-profile.json](sample-profile.json) from Settings to try the workf
 4. Select **Start filling** in ResumeBridge.
 5. Review filled fields and the pending-field list.
 6. Complete uploads, sensitive questions, CAPTCHAs, and final submission manually.
-7. Reopen ResumeBridge, verify the company, role, time, and status under **Application tracking**, then save the record.
-8. Open the tracker to update statuses and notes or export CSV.
+7. Reopen ResumeBridge, verify the company, role, channel, time, and status under **Application tracking**, then save the record.
+8. Open the tracker to search and sort records, update pipeline stages inline, edit status-page links, or import and export CSV.
 
 ## Compatibility notes
 
@@ -154,7 +155,7 @@ npm test        # Run unit tests
 npm run verify  # Run checks and tests
 ```
 
-Current tests cover conservative fill policy, extension-message privilege boundaries, AI request redaction, the single bounded AI mapping path, split year/month dropdown filling, project-section and add-action recognition, repeated project ordering, legacy backup compatibility, local fallback behavior, job-page detection, and application-history persistence. Browser smoke-test notes are available in [docs/qa/resume-bridge-foundation.md](docs/qa/resume-bridge-foundation.md).
+Current tests cover conservative fill policy, extension-message privilege boundaries, AI request redaction, the single bounded AI mapping path, split year/month dropdown filling, project-section and add-action recognition, repeated project ordering, legacy backup compatibility, local fallback behavior, job-page detection, pipeline migration, CSV parsing and formula-injection defenses, deduplication, and application-history persistence. Browser smoke-test notes are available in [docs/qa/resume-bridge-foundation.md](docs/qa/resume-bridge-foundation.md).
 
 ## Repository layout
 

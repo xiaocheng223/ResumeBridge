@@ -4,7 +4,7 @@
   "private": true,
   "description": "Privacy-conscious browser extension for filling job application forms from one local profile.",
   "scripts": {
-    "check": "node --check src/background.js && node --check src/content.js && node --check src/options.js && node --check src/popup.js && node --check src/tracker.js && node --check src/job-tracker.js && node --check src/date-utils.js && node --check src/project-utils.js && node --check src/safety-policy.js && node --check src/message-policy.js && node --check src/ai-privacy.js && node --check scripts/qa-extension-smoke.js",
+    "check": "node --check src/background.js && node --check src/content.js && node --check src/options.js && node --check src/popup.js && node --check src/tracker.js && node --check src/job-tracker.js && node --check src/date-utils.js && node --check src/project-utils.js && node --check src/profile-utils.js && node --check src/safety-policy.js && node --check src/message-policy.js && node --check src/ai-privacy.js && node --check scripts/qa-extension-smoke.js",
     "test": "node --test tests/*.test.js",
     "verify": "npm run check && npm test"
   },

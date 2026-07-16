@@ -74,6 +74,9 @@
     const isEnd = /结束|截止|毕业|离职/.test(text);
     const role = isStart && !isEnd ? "start" : isEnd && !isStart ? "end" : "";
     if (!role) {
+      if (/(?:发布|发表|出版)(?:年份|年|year)$/.test(text)) {
+        return { role: "", part: "year" };
+      }
       return { role: "", part: "" };
     }
 

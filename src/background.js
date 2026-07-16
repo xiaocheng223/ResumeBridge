@@ -145,6 +145,8 @@ async function handleMessage(message, sender = {}) {
       return getJobApplications();
     case "OJAF_SAVE_JOB_APPLICATION":
       return saveJobApplication(message.payload || {});
+    case "OJAF_IMPORT_JOB_APPLICATIONS":
+      return importJobApplications(message.payload || {});
     case "OJAF_DELETE_JOB_APPLICATION":
       return deleteJobApplication(message.payload || {});
     case "OJAF_CLEAR_JOB_APPLICATIONS":
@@ -257,13 +259,22 @@ async function saveJobApplication(payload) {
 
   if (existingIndex >= 0) {
     const existing = applications[existingIndex];
-    const application = normalizeJobApplication(
+    let application = normalizeJobApplication(
       {
         ...existing,
         ...source,
         id: existing.id,
         createdAt: existing.createdAt,
         updatedAt: now
+      },
+      { now }
+    );
+    application = normalizeJobApplication(
+      {
+        ...application,
+        statusUpdatedAt: application.status === existing.status
+          ? existing.statusUpdatedAt || existing.updatedAt || now
+          : now
       },
       { now }
     );
@@ -296,6 +307,64 @@ async function saveJobApplication(payload) {
   const normalized = normalizeJobApplications([application, ...applications]).slice(0, MAX_JOB_APPLICATIONS);
   await chrome.storage.local.set({ [STORAGE_KEYS.jobApplications]: normalized });
   return { application, created: true, duplicate: false };
+}
+
+async function importJobApplications(payload) {
+  const sources = Array.isArray(payload.applications)
+    ? payload.applications.slice(0, MAX_JOB_APPLICATIONS)
+    : [];
+  const result = await chrome.storage.local.get([STORAGE_KEYS.jobApplications]);
+  const existing = normalizeJobApplications(result[STORAGE_KEYS.jobApplications]);
+  const next = existing.slice();
+  const fingerprints = new Set(existing.map(buildApplicationFingerprint));
+  const now = new Date().toISOString();
+  let importedCount = 0;
+  let skippedCount = 0;
+  let invalidCount = 0;
+
+  for (const source of sources) {
+    if (!isPlainObject(source)) {
+      invalidCount += 1;
+      continue;
+    }
+
+    const application = normalizeJobApplication(
+      {
+        ...source,
+        id: createJobApplicationId(),
+        createdAt: now,
+        updatedAt: now
+      },
+      { now }
+    );
+    if (!application.companyName || !application.jobTitle) {
+      invalidCount += 1;
+      continue;
+    }
+
+    const fingerprint = buildApplicationFingerprint(application);
+    if (fingerprints.has(fingerprint) || next.length >= MAX_JOB_APPLICATIONS) {
+      skippedCount += 1;
+      continue;
+    }
+
+    fingerprints.add(fingerprint);
+    next.push(application);
+    importedCount += 1;
+  }
+
+  if (importedCount > 0) {
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.jobApplications]: normalizeJobApplications(next).slice(0, MAX_JOB_APPLICATIONS)
+    });
+  }
+
+  return {
+    importedCount,
+    skippedCount,
+    invalidCount,
+    totalCount: existing.length + importedCount
+  };
 }
 
 async function deleteJobApplication(payload) {

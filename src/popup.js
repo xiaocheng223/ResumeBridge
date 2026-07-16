@@ -1,3 +1,5 @@
+const trackerApi = globalThis.ResumeBridgeJobTracker;
+
 const els = {
   status: document.getElementById("status"),
   openOptions: document.getElementById("openOptions"),
@@ -7,17 +9,28 @@ const els = {
   openTracker: document.getElementById("openTracker"),
   applicationCaptureForm: document.getElementById("applicationCaptureForm"),
   captureFeedback: document.getElementById("captureFeedback"),
+  captureCandidateField: document.getElementById("captureCandidateField"),
+  captureCandidate: document.getElementById("captureCandidate"),
   captureCompanyName: document.getElementById("captureCompanyName"),
   captureJobTitle: document.getElementById("captureJobTitle"),
   captureAppliedAt: document.getElementById("captureAppliedAt"),
   captureStatus: document.getElementById("captureStatus"),
+  captureChannel: document.getElementById("captureChannel"),
   captureNotes: document.getElementById("captureNotes"),
   saveApplication: document.getElementById("saveApplication")
 };
 
 const DEFAULT_START_LABEL = els.startAutofillBtn.textContent;
-const CONTENT_SCRIPT_FILES = ["src/safety-policy.js", "src/date-utils.js", "src/project-utils.js", "src/job-tracker.js", "src/content.js"];
+const CONTENT_SCRIPT_FILES = [
+  "src/safety-policy.js",
+  "src/date-utils.js",
+  "src/project-utils.js",
+  "src/profile-utils.js",
+  "src/job-tracker.js",
+  "src/content.js"
+];
 let capturedJobPageInfo = null;
+let capturedJobCandidates = [];
 
 els.openOptions.addEventListener("click", () => chrome.runtime.openOptionsPage());
 els.startAutofillBtn.addEventListener("click", () => {
@@ -30,6 +43,12 @@ els.clearMarksBtn.addEventListener("click", () => {
   void clearMarks();
 });
 els.openTracker.addEventListener("click", openTrackerPage);
+els.captureCandidate.addEventListener("change", () => {
+  const candidate = capturedJobCandidates[Number(els.captureCandidate.value)];
+  if (candidate) {
+    applyCapturedCandidate(candidate);
+  }
+});
 els.applicationCaptureForm.addEventListener("submit", (event) => {
   event.preventDefault();
   void saveCurrentApplication();
@@ -38,6 +57,7 @@ initialize();
 
 async function initialize() {
   setStatus("点击开始填写后，右下角会实时显示当前是本地规则还是 AI；AI 不可用也能继续用本地规则填写。");
+  populateCaptureStatuses();
   els.captureAppliedAt.value = toLocalDateTimeInput(new Date());
   await Promise.allSettled([syncRuntimeState(), loadCurrentJobPageInfo()]);
 }
@@ -47,11 +67,31 @@ async function loadCurrentJobPageInfo() {
   try {
     const response = await sendToActiveTab({ type: "OJAF_GET_JOB_PAGE_INFO" });
     capturedJobPageInfo = response?.data || {};
-    els.captureCompanyName.value = capturedJobPageInfo.companyName || "";
-    els.captureJobTitle.value = capturedJobPageInfo.jobTitle || "";
+    capturedJobCandidates = Array.isArray(capturedJobPageInfo.candidates)
+      ? capturedJobPageInfo.candidates
+      : [];
+    renderCapturedCandidates();
+
+    if (capturedJobCandidates.length > 0) {
+      applyCapturedCandidate(capturedJobCandidates[0]);
+      setCaptureFeedback(
+        capturedJobCandidates.length > 1
+          ? `识别到 ${capturedJobCandidates.length} 条投递记录，请选择并核对后保存。`
+          : "已从投递记录卡片识别公司、职位、时间和状态，请核对后保存。",
+        "success"
+      );
+      return;
+    }
+
+    applyCapturedCandidate(capturedJobPageInfo);
 
     if (capturedJobPageInfo.companyName && capturedJobPageInfo.jobTitle) {
-      setCaptureFeedback("已从当前页面识别公司和职位，请核对后记录。", "success");
+      const confidence = capturedJobPageInfo.confidence || {};
+      const isReliable = Number(confidence.companyName || 0) >= 0.85 && Number(confidence.jobTitle || 0) >= 0.85;
+      setCaptureFeedback(
+        isReliable ? "已从官方职位数据识别公司和职位，请核对后记录。" : "已识别公司和职位，但证据有限，请核对后记录。",
+        isReliable ? "success" : ""
+      );
     } else if (capturedJobPageInfo.companyName || capturedJobPageInfo.jobTitle) {
       setCaptureFeedback("已识别部分信息，请补充缺失项后记录。", "");
     } else {
@@ -59,8 +99,65 @@ async function loadCurrentJobPageInfo() {
     }
   } catch {
     capturedJobPageInfo = null;
+    capturedJobCandidates = [];
+    renderCapturedCandidates();
     setCaptureFeedback("当前页面无法自动识别，可手动填写后记录。", "");
   }
+}
+
+function renderCapturedCandidates() {
+  els.captureCandidate.replaceChildren();
+  capturedJobCandidates.forEach((candidate, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = [
+      candidate.companyName || "公司待补充",
+      candidate.jobTitle || "职位待补充",
+      formatCandidateDate(candidate.appliedAt)
+    ].filter(Boolean).join(" / ");
+    els.captureCandidate.appendChild(option);
+  });
+  els.captureCandidateField.hidden = capturedJobCandidates.length <= 1;
+}
+
+function applyCapturedCandidate(candidate = {}) {
+  const base = capturedJobPageInfo || {};
+  capturedJobPageInfo = {
+    ...base,
+    ...candidate,
+    companyName: candidate.companyName || base.companyName || "",
+    jobTitle: candidate.jobTitle || base.jobTitle || "",
+    sourceUrl: candidate.sourceUrl || base.sourceUrl || "",
+    sourceSite: candidate.sourceSite || base.sourceSite || "",
+    statusUrl: candidate.statusUrl || base.statusUrl || base.sourceUrl || ""
+  };
+  els.captureCompanyName.value = capturedJobPageInfo.companyName;
+  els.captureJobTitle.value = capturedJobPageInfo.jobTitle;
+  els.captureChannel.value = candidate.channel
+    || base.channel
+    || trackerApi?.inferApplicationChannel?.(capturedJobPageInfo.sourceUrl, capturedJobPageInfo.sourceSite)
+    || "";
+  if (candidate.appliedAt) {
+    els.captureAppliedAt.value = toLocalDateTimeInput(new Date(candidate.appliedAt));
+  }
+  if (candidate.status && trackerApi?.JOB_APPLICATION_STATUSES?.includes(candidate.status)) {
+    els.captureStatus.value = candidate.status;
+  }
+  if (candidate.notes) {
+    els.captureNotes.value = candidate.notes;
+  }
+}
+
+function formatCandidateDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }
 
 async function saveCurrentApplication() {
@@ -78,6 +175,8 @@ async function saveCurrentApplication() {
           companyName: els.captureCompanyName.value,
           jobTitle: els.captureJobTitle.value,
           appliedAt: new Date(els.captureAppliedAt.value).toISOString(),
+          channel: els.captureChannel.value,
+          statusUrl: capturedJobPageInfo?.statusUrl || capturedJobPageInfo?.sourceUrl || "",
           status: els.captureStatus.value,
           notes: els.captureNotes.value,
           sourceUrl: capturedJobPageInfo?.sourceUrl || "",
@@ -96,6 +195,20 @@ async function saveCurrentApplication() {
   } finally {
     els.saveApplication.disabled = false;
     els.saveApplication.textContent = "记录本次投递";
+  }
+}
+
+function populateCaptureStatuses() {
+  const statuses = Array.isArray(trackerApi?.JOB_APPLICATION_STATUSES)
+    ? trackerApi.JOB_APPLICATION_STATUSES
+    : ["待投递", "已投递", "笔试", "面试", "Offer", "已拒绝", "已撤回"];
+  els.captureStatus.replaceChildren();
+  for (const status of statuses) {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    option.selected = status === "已投递";
+    els.captureStatus.appendChild(option);
   }
 }
 

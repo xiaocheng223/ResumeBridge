@@ -123,7 +123,14 @@ async function sendContentMessage(worker, message, options = {}) {
     if (injectScripts) {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ["src/safety-policy.js", "src/date-utils.js", "src/project-utils.js", "src/job-tracker.js", "src/content.js"]
+        files: [
+          "src/safety-policy.js",
+          "src/date-utils.js",
+          "src/project-utils.js",
+          "src/profile-utils.js",
+          "src/job-tracker.js",
+          "src/content.js"
+        ]
       });
     }
     return chrome.tabs.sendMessage(tab.id, request);

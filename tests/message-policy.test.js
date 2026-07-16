@@ -48,6 +48,7 @@ test("blocks settings mutations from content-script senders", () => {
     "OJAF_TEST_CONNECTION",
     "OJAF_GET_JOB_APPLICATIONS",
     "OJAF_SAVE_JOB_APPLICATION",
+    "OJAF_IMPORT_JOB_APPLICATIONS",
     "OJAF_DELETE_JOB_APPLICATION",
     "OJAF_CLEAR_JOB_APPLICATIONS"
   ]) {

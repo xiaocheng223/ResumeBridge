@@ -44,10 +44,14 @@ test("describes four-part date ranges by control order", () => {
   });
 });
 
-test("infers date components only from explicit split labels", () => {
+test("infers date components from split labels and publication-year controls", () => {
   assert.deepEqual(dateUtils.inferDateComponent("教育背景 / 开始时间月"), {
     role: "start",
     part: "month"
+  });
+  assert.deepEqual(dateUtils.inferDateComponent("论文/专著 / 发布年份"), {
+    role: "",
+    part: "year"
   });
   assert.deepEqual(dateUtils.inferDateComponent("出生年月"), {
     role: "",

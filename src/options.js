@@ -166,6 +166,12 @@ const RESUME_SECTION_GUIDE = [
     tips: ["声明类问题通常要认真核对，不建议盲填。", "行业或公司专属措辞建议统一写成“应聘单位”。"]
   },
   {
+    key: "questionnaire",
+    title: "网申问答",
+    aliases: ["求职问答", "开放性问题", "附加问题"],
+    tips: ["公司期望、个人优缺点、岗位技能等开放题建议先维护事实版本，再按岗位调整。", "这类内容默认需要核对，避免把同一段答案无差别提交给不同公司。"]
+  },
+  {
     key: "other",
     title: "其他信息",
     aliases: ["补充信息", "自定义资料"],
@@ -216,11 +222,14 @@ const STRUCTURED_RESUME_SECTIONS = [
       "高考时间",
       "高考分数",
       "高考科目",
+      "参加工作时间",
       "工作年限",
       "专业技术职称",
       "紧急联系人",
       "紧急联系人电话",
-      "与紧急联系人关系"
+      "与紧急联系人关系",
+      "紧急联系人单位",
+      "紧急联系人职务"
     ])
   },
   {
@@ -229,7 +238,21 @@ const STRUCTURED_RESUME_SECTIONS = [
     kind: "repeat",
     itemLabel: "求职意向",
     defaultItems: 1,
-    fields: profileFields(["意向岗位", "预计入职时间", "当前薪资", "期望工作城市", "期望薪资", "面试城市", "是否接受调剂"])
+    fields: [
+      ...profileFields([
+        "意向岗位",
+        "预计入职时间",
+        "预计报到时间",
+        "当前薪资",
+        "期望工作城市",
+        "期望薪资",
+        "期望月薪",
+        "期望年薪",
+        "面试城市",
+        "是否接受调剂"
+      ]),
+      profileField("对目标公司的期望", { type: "textarea", rows: 4, span: true })
+    ]
   },
   {
     key: "education",
@@ -249,6 +272,7 @@ const STRUCTURED_RESUME_SECTIONS = [
       "学历",
       "学习形式",
       "学校类别",
+      "一级学科",
       "录取批次",
       "学院（院系）",
       "培养方式",
@@ -415,7 +439,15 @@ const STRUCTURED_RESUME_SECTIONS = [
     kind: "repeat",
     itemLabel: "论文和著作",
     defaultItems: 1,
-    fields: profileFields(["发表时间", "刊物名称", "刊物层级", "论文名称", "论文描述"])
+    fields: [
+      profileField("发表时间"),
+      profileField("发表日期", { type: "date" }),
+      profileField("刊物名称"),
+      profileField("刊物层级"),
+      profileField("论文名称"),
+      profileField("是否第一作者"),
+      profileField("论文描述")
+    ]
   },
   {
     key: "patent",
@@ -445,6 +477,17 @@ const STRUCTURED_RESUME_SECTIONS = [
       "是否同意背景调查",
       "本人声明以上填写内容与事实完全相符"
     ])
+  },
+  {
+    key: "questionnaire",
+    title: "网申问答",
+    kind: "simple",
+    fields: [
+      profileField("求职过程中最困扰的问题", { type: "textarea", rows: 4, span: true }),
+      profileField("个人优缺点", { type: "textarea", rows: 4, span: true }),
+      profileField("岗位相关突出技能", { type: "textarea", rows: 4, span: true }),
+      profileField("获取招聘信息途径")
+    ]
   },
   {
     key: "other",
